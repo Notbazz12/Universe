@@ -5,7 +5,7 @@
 #define MyAppName "Universe"
 #define MyAppVersion "2.0"
 #define MyAppPublisher "Notbanzz"
-#define MyAppURL "https://github.com/Notbanzz/NoFences"
+#define MyAppURL "https://github.com/Notbazz12/Universe"
 #define MyAppExeName "Universe.exe"
 
 [Setup]
