@@ -35,13 +35,18 @@ namespace NoFences.Services
 
         public void CheckForUpdates(bool silent)
         {
+            var config = AppConfig.Load();
+            if (silent && !config.AutoCheckUpdates)
+            {
+                return; // User has auto-update check on startup disabled
+            }
+
             _loggingService.LogInfo("Checking for updates...");
             try
             {
                 // GitHub/Render requires TLS 1.2+
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
-                var config = AppConfig.Load();
                 var versionUrl = !string.IsNullOrWhiteSpace(config.UpdateUrl) ? config.UpdateUrl : DefaultVersionUrl;
 
                 using (var client = new WebClient())
@@ -51,9 +56,6 @@ namespace NoFences.Services
                     var updateInfo = JObject.Parse(json);
                     var remoteVersion = updateInfo["version"]?.ToString();
                     var downloadUrl = updateInfo["downloadUrl"]?.ToString();
-
-                    // Optional SHA-256 field in version.json — if provided we verify
-                    // the installer before executing it. If absent we warn the user.
                     var expectedHash = updateInfo["sha256"]?.ToString();
 
                     if (string.IsNullOrEmpty(remoteVersion) || string.IsNullOrEmpty(downloadUrl))
@@ -66,21 +68,24 @@ namespace NoFences.Services
                     {
                         _loggingService.LogInfo($"New version found: {remoteVersion}");
 
-                        // FIX: Show dialog on UI thread to avoid cross-thread race
-                        RunOnUiThread(() =>
+                        if (!silent)
                         {
-                            var result = MessageBox.Show(
-                                $"A new version of Universe is available ({remoteVersion}).\n\nDo you want to download and install it now?",
-                                "Update Available",
-                                MessageBoxButtons.YesNo,
-                                MessageBoxIcon.Information
-                            );
-
-                            if (result == DialogResult.Yes)
+                            // Manual check (user clicked button): show confirmation dialog
+                            RunOnUiThread(() =>
                             {
-                                DownloadAndInstall(downloadUrl, expectedHash);
-                            }
-                        });
+                                var result = MessageBox.Show(
+                                    $"A new version of Universe is available ({remoteVersion}).\n\nDo you want to download and install it now?",
+                                    "Update Available",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Information
+                                );
+
+                                if (result == DialogResult.Yes)
+                                {
+                                    DownloadAndInstall(downloadUrl, expectedHash);
+                                }
+                            });
+                        }
                     }
                     else
                     {

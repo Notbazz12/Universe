@@ -65,7 +65,7 @@ namespace NoFences.UI.Pages
             y += 40;
 
             // ── System Preferences Card ──────────────────────────────────────────
-            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 220);
+            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 260);
             int cy = 42;
 
             // Language selector
@@ -91,6 +91,7 @@ namespace NoFences.UI.Pages
             cy += 48;
 
             CreateToggleRow(sysCard, "Start Universe with Windows", IsStartupEnabled(), ref cy, on => SetStartup(on));
+            CreateToggleRow(sysCard, "Check for updates automatically on startup", config.AutoCheckUpdates, ref cy, on => { config.AutoCheckUpdates = on; config.Save(); });
             CreateToggleRow(sysCard, "Laptop Mode (disables blur to maximize battery)", config.LaptopMode, ref cy,
                 on => { config.LaptopMode = on; config.Save(); Info("Restart to apply Laptop Mode."); });
             CreateToggleRow(sysCard, "Smooth Hardware Animations", config.EnableAnimations, ref cy,
