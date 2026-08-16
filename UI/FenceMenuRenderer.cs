@@ -5,10 +5,15 @@ namespace NoFences.UI
 {
     public class FenceMenuRenderer : ToolStripProfessionalRenderer
     {
-        private readonly Color backgroundColor = Color.FromArgb(240, 30, 30, 30); // Dark background
-        private readonly Color textColor = Color.White;
-        private readonly Color selectionColor = Color.FromArgb(100, 100, 100, 100); // Semi-transparent selection
-        private readonly Color separatorColor = Color.FromArgb(80, 255, 255, 255);
+        private static readonly Color backgroundColor = Color.FromArgb(240, 30, 30, 30);
+        private static readonly Color textColor = Color.White;
+        private static readonly Color selectionColor = Color.FromArgb(100, 100, 100, 100);
+        private static readonly Color separatorColor = Color.FromArgb(80, 255, 255, 255);
+
+        // Cached brushes to prevent allocating GDI objects on every menu item paint
+        private static readonly SolidBrush bgBrush = new SolidBrush(backgroundColor);
+        private static readonly SolidBrush selectionBrush = new SolidBrush(selectionColor);
+        private static readonly SolidBrush separatorBrush = new SolidBrush(separatorColor);
 
         public FenceMenuRenderer() : base(new FenceColorTable())
         {
@@ -16,20 +21,19 @@ namespace NoFences.UI
 
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
-            e.Graphics.FillRectangle(new SolidBrush(backgroundColor), e.AffectedBounds);
+            e.Graphics.FillRectangle(bgBrush, e.AffectedBounds);
         }
 
         protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
         {
-            // Do not render the default light image margin
-            e.Graphics.FillRectangle(new SolidBrush(backgroundColor), e.AffectedBounds);
+            e.Graphics.FillRectangle(bgBrush, e.AffectedBounds);
         }
 
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
             if (e.Item.Selected)
             {
-                e.Graphics.FillRectangle(new SolidBrush(selectionColor), new Rectangle(Point.Empty, e.Item.Size));
+                e.Graphics.FillRectangle(selectionBrush, new Rectangle(Point.Empty, e.Item.Size));
             }
             else
             {
@@ -45,7 +49,7 @@ namespace NoFences.UI
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
-            e.Graphics.FillRectangle(new SolidBrush(separatorColor), new Rectangle(30, 3, e.Item.Width - 35, 1));
+            e.Graphics.FillRectangle(separatorBrush, new Rectangle(30, 3, e.Item.Width - 35, 1));
         }
 
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)

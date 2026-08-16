@@ -25,6 +25,7 @@ namespace NoFences.Persistence
         private readonly string _basePath;
         private readonly JsonSerializerSettings _jsonSettings;
         private readonly ILoggingService _loggingService;
+        private readonly object _fileLock = new object();
 
         public JsonPersistenceService(ILoggingService loggingService)
         {
@@ -55,8 +56,28 @@ namespace NoFences.Persistence
             EnsureDirectoryExists(fencePath);
 
             var metaFile = Path.Combine(fencePath, MetaFileName);
+            var tempFile = Path.Combine(fencePath, MetaFileName + ".tmp");
             var json = JsonConvert.SerializeObject(fenceInfo, _jsonSettings);
-            File.WriteAllText(metaFile, json);
+
+            lock (_fileLock)
+            {
+                try
+                {
+                    // Atomic write: write to temp file first, then replace live file
+                    File.WriteAllText(tempFile, json);
+                    if (File.Exists(metaFile))
+                    {
+                        File.Delete(metaFile);
+                    }
+                    File.Move(tempFile, metaFile);
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Failed to save fence {fenceInfo.Name} atomically: {ex.Message}", ex);
+                    // Fallback direct write
+                    File.WriteAllText(metaFile, json);
+                }
+            }
         }
 
         public FenceInfo LoadFence(Guid fenceId)
@@ -67,8 +88,19 @@ namespace NoFences.Persistence
             if (!File.Exists(metaFile))
                 return null;
 
-            var json = File.ReadAllText(metaFile);
-            return JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings);
+            lock (_fileLock)
+            {
+                try
+                {
+                    var json = File.ReadAllText(metaFile);
+                    return JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings);
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Failed to load fence {fenceId}: {ex.Message}", ex);
+                    return null;
+                }
+            }
         }
 
         public List<FenceInfo> LoadAllFences()
@@ -85,7 +117,11 @@ namespace NoFences.Persistence
                 {
                     try
                     {
-                        var json = File.ReadAllText(metaFile);
+                        string json;
+                        lock (_fileLock)
+                        {
+                            json = File.ReadAllText(metaFile);
+                        }
                         var fence = JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings);
                         if (fence != null)
                         {
@@ -106,9 +142,19 @@ namespace NoFences.Persistence
         public void DeleteFence(Guid fenceId)
         {
             var fencePath = GetFencePath(fenceId);
-            if (Directory.Exists(fencePath))
+            lock (_fileLock)
             {
-                Directory.Delete(fencePath, true);
+                if (Directory.Exists(fencePath))
+                {
+                    try
+                    {
+                        Directory.Delete(fencePath, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"Failed to delete fence directory {fencePath}: {ex.Message}", ex);
+                    }
+                }
             }
         }
 

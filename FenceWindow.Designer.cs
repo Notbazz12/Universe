@@ -1,4 +1,4 @@
-﻿namespace NoFences
+namespace NoFences
 {
     partial class FenceWindow
     {
@@ -26,7 +26,23 @@
                 appContextMenu?.Dispose();
                 throttledMove?.Dispose();
                 throttledResize?.Dispose();
-                
+                breathingEffect?.Dispose();
+                shellContextMenu?.ReleaseAll();
+
+                // FIX: stop and dispose the context-check timer so it cannot fire
+                // after this window is gone (was a guaranteed resource leak before)
+                if (contextTimer != null)
+                {
+                    contextTimer.Stop();
+                    contextTimer.Dispose();
+                    contextTimer = null;
+                }
+
+                // Dispose cached GDI+ brushes and pens
+                _hoverBrush?.Dispose();
+                _selectedBrush?.Dispose();
+                _outlinePen?.Dispose();
+
                 // Unsubscribe from events
                 if (thumbnailProvider != null)
                 {

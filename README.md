@@ -1,4 +1,8 @@
+<<<<<<< HEAD
  NoFences v2.5 🌌
+=======
+# NoFences v2.5 🌌
+>>>>>>> 653a168 (feat: Cyber-Glass & Iridescent Bubble UI, fix crashes and exit, add automated update server and GitHub workflow)
 
 **NoFences** is a powerful, open-source alternative to Stardock Fences for Windows. Organize your desktop icons into collapsible, customizable containers ("fences") to keep your workspace clean and productive.
 

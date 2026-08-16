@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace NoFences.Model
@@ -62,7 +62,11 @@ namespace NoFences.Model
             Id = id;
         }
 
-        // Innovative Features
+        // Innovative Features & Themes
+        public string Theme { get; set; } = "CyberGlass"; // "CyberGlass", "DarkObsidian", "Classic"
+        public int CornerRadius { get; set; } = 12;
+        public bool EnableIridescentBorder { get; set; } = true;
+        public bool ShowItemCountBadge { get; set; } = true;
         public bool EnableMagicColor { get; set; } = false;
         public bool EnableBreathingEffect { get; set; } = false;
         public FenceContext Context { get; set; } = FenceContext.Always;

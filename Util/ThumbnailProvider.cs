@@ -1,10 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NoFences.Win32;
 
 namespace NoFences.Util
 {
@@ -28,50 +29,106 @@ namespace NoFences.Util
         }
 
         // Only allow 4 concurrent images to be decoded to try and prevent OOM errors
-        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(4);
-        private readonly IDictionary<string, ThumbnailState> iconCache = new Dictionary<string, ThumbnailState>();
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(4, 4);
+        private readonly ConcurrentDictionary<string, ThumbnailState> iconCache = new ConcurrentDictionary<string, ThumbnailState>(StringComparer.OrdinalIgnoreCase);
         public event EventHandler IconThumbnailLoaded;
 
         public bool IsSupported(string path)
         {
-            return SupportedExtensions.Any(ext => path.EndsWith(ext));
+            if (string.IsNullOrEmpty(path)) return false;
+            return SupportedExtensions.Any(ext => path.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
         }
 
         public Icon GenerateThumbnail(string path)
         {
-            if (!iconCache.ContainsKey(path))
+            if (string.IsNullOrEmpty(path)) return null;
+
+            if (iconCache.TryGetValue(path, out var state))
             {
-                return SubmitGeneratorTask(path).icon;
+                return state.icon;
             }
-            else
-            {
-                return iconCache[path].icon;
-            }
+
+            return SubmitGeneratorTask(path).icon;
         }
 
         private ThumbnailState SubmitGeneratorTask(string path)
         {
-            var state = new ThumbnailState() { icon = Icon.ExtractAssociatedIcon(path) };
+            Icon fallbackIcon = null;
+            try
+            {
+                if (File.Exists(path))
+                    fallbackIcon = Icon.ExtractAssociatedIcon(path);
+            }
+            catch
+            {
+                // Ignore fallback extraction errors
+            }
+
+            var state = new ThumbnailState() { icon = fallbackIcon };
             iconCache[path] = state;
 
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                semaphore.Wait();
-                using (MemoryStream ms = new MemoryStream(File.ReadAllBytes(path)))
+                bool acquired = false;
+                try
                 {
+                    await semaphore.WaitAsync();
+                    acquired = true;
+
+                    if (!File.Exists(path)) return;
+
+                    byte[] fileBytes;
+                    using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var ms = new MemoryStream())
+                    {
+                        await fs.CopyToAsync(ms);
+                        fileBytes = ms.ToArray();
+                    }
+
+                    using (var ms = new MemoryStream(fileBytes))
                     using (var img = Image.FromStream(ms))
                     {
-                        var thumb = (Bitmap)img.GetThumbnailImage(32, 32, () => false, IntPtr.Zero);
-                        var icon = Icon.FromHandle(thumb.GetHicon());
-                        state.icon = icon;
-                        IconThumbnailLoaded(this, new EventArgs());
+                        using (var thumb = (Bitmap)img.GetThumbnailImage(32, 32, () => false, IntPtr.Zero))
+                        {
+                            IntPtr hIcon = thumb.GetHicon();
+                            try
+                            {
+                                var icon = (Icon)Icon.FromHandle(hIcon).Clone();
+                                var oldIcon = state.icon;
+                                state.icon = icon;
+
+                                // Dispose previous icon if it was our custom clone
+                                if (oldIcon != null && oldIcon != fallbackIcon)
+                                {
+                                    oldIcon.Dispose();
+                                }
+
+                                IconThumbnailLoaded?.Invoke(this, EventArgs.Empty);
+                            }
+                            finally
+                            {
+                                if (hIcon != IntPtr.Zero)
+                                {
+                                    IconUtil.DestroyIcon(hIcon);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fail silently to keep fallback icon
+                }
+                finally
+                {
+                    if (acquired)
+                    {
                         semaphore.Release();
-                        return icon;
                     }
                 }
             });
+
             return state;
         }
-
     }
 }

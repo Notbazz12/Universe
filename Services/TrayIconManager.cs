@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using NoFences.Model;
+using NoFences.UI;
 
 namespace NoFences.Services
 {
@@ -29,18 +30,24 @@ namespace NoFences.Services
             _loggingService.LogInfo("Initializing Tray Icon...");
 
             _contextMenu = new ContextMenuStrip();
+            _contextMenu.Renderer = new FenceMenuRenderer();
             
             // New Fence
             var newFenceItem = new ToolStripMenuItem(LocalizationManager.GetString("NewFence"));
             newFenceItem.Click += (s, e) => CreateNewFence();
             _contextMenu.Items.Add(newFenceItem);
 
-            _contextMenu.Items.Add(new ToolStripSeparator());
-
             // Show/Hide Fences (Toggle)
             var toggleItem = new ToolStripMenuItem(LocalizationManager.GetString("HideFences"));
             toggleItem.Click += (s, e) => ToggleFences(toggleItem);
             _contextMenu.Items.Add(toggleItem);
+
+            _contextMenu.Items.Add(new ToolStripSeparator());
+
+            // Settings
+            var settingsItem = new ToolStripMenuItem(LocalizationManager.GetString("ConfigureFences") ?? "Settings...");
+            settingsItem.Click += (s, e) => OpenSettings();
+            _contextMenu.Items.Add(settingsItem);
 
             _contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -57,7 +64,7 @@ namespace NoFences.Services
                 Visible = true
             };
 
-            _notifyIcon.DoubleClick += (s, e) => CreateNewFence(); // Double click creates a fence too
+            _notifyIcon.DoubleClick += (s, e) => OpenSettings();
         }
 
         private void CreateNewFence()
@@ -68,24 +75,53 @@ namespace NoFences.Services
 
         private void ToggleFences(ToolStripMenuItem item)
         {
-            // TODO: Implement global show/hide logic in FenceService
-            // For now, just log
-            _loggingService.LogInfo("Tray Icon: Toggle fences requested");
-            // This requires FenceService to support hiding/showing all windows.
-            // We'll leave this as a placeholder or implement basic loop if needed.
-            // item.Text = visible ? LocalizationManager.GetString("HideFences") : LocalizationManager.GetString("ShowFences");
+            bool current = _fenceService.AreFencesVisible;
+            bool next = !current;
+            _fenceService.SetAllFencesVisible(next);
+            item.Text = next ? LocalizationManager.GetString("HideFences") : LocalizationManager.GetString("ShowFences");
+            _loggingService.LogInfo($"Tray Icon: Toggle fences set to {next}");
+        }
+
+        private void OpenSettings()
+        {
+            var allFences = _fenceService.GetAllFences();
+            var targetFence = allFences.Count > 0 ? allFences[0] : new FenceInfo(Guid.NewGuid()) { Name = "General" };
+            var settings = new SettingsWindow(targetFence, () =>
+            {
+                foreach (var fence in _fenceService.GetAllFences())
+                {
+                    _fenceService.ReloadFence(fence.Id);
+                }
+            });
+            settings.Show();
+            settings.BringToFront();
+            settings.Activate();
         }
 
         private void ExitApplication()
         {
-            _loggingService.LogInfo("Tray Icon: Exiting application");
-            _notifyIcon.Visible = false;
+            _loggingService.LogInfo("Tray Icon: Exiting application completely");
+            Dispose();
+            try
+            {
+                _fenceService.CloseAllFences();
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogWarning($"Error closing fences during exit: {ex.Message}");
+            }
             Application.Exit();
+            Environment.Exit(0);
         }
 
         public void Dispose()
         {
-            _notifyIcon?.Dispose();
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
             _contextMenu?.Dispose();
         }
     }

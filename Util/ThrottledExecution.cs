@@ -1,16 +1,13 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 namespace NoFences.Util
 {
     public class ThrottledExecution : IDisposable
     {
-        private TimeSpan delay;
-
-        private DateTime lastExecution = DateTime.Now;
-
-        private TimeSpan TimeSinceLastExecution => DateTime.Now - lastExecution;
-
+        private readonly TimeSpan delay;
+        private DateTime lastExecution = DateTime.MinValue;
+        private TimeSpan TimeSinceLastExecution => DateTime.UtcNow - lastExecution;
         private volatile bool isAwaiting;
         private bool disposed = false;
 
@@ -21,27 +18,41 @@ namespace NoFences.Util
 
         public async void Run(Action action)
         {
-            if (disposed) return;
-            
-            if (TimeSinceLastExecution > delay)
-                action.Invoke();
-            else if (!isAwaiting)
+            if (disposed || action == null) return;
+
+            try
             {
-                isAwaiting = true;
-                while (TimeSinceLastExecution < delay && !disposed)
+                if (TimeSinceLastExecution >= delay)
                 {
-                    await Task.Delay((int)(delay.TotalMilliseconds - TimeSinceLastExecution.TotalMilliseconds));
-                    if (!disposed)
-                        action.Invoke();
+                    lastExecution = DateTime.UtcNow;
+                    action.Invoke();
                 }
-                isAwaiting = false;
+                else if (!isAwaiting)
+                {
+                    isAwaiting = true;
+                    while (TimeSinceLastExecution < delay && !disposed)
+                    {
+                        var remainingMs = (int)Math.Max(1, delay.TotalMilliseconds - TimeSinceLastExecution.TotalMilliseconds);
+                        await Task.Delay(remainingMs).ConfigureAwait(true);
+                        if (!disposed)
+                        {
+                            lastExecution = DateTime.UtcNow;
+                            action.Invoke();
+                        }
+                    }
+                    isAwaiting = false;
+                }
             }
-            lastExecution = DateTime.Now;
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ThrottledExecution error: {ex.Message}");
+            }
         }
 
         public void Dispose()
         {
             disposed = true;
+            isAwaiting = false;
         }
     }
 }

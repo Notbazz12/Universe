@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using System.IO;
 using System.Diagnostics;
@@ -15,200 +16,295 @@ namespace NoFences.UI.Pages
         private const string RunKey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
         private const string AppName = "Universe";
         private AppConfig config;
+        private CyberScrollPanel scrollHost;
 
         public GeneralPage()
         {
-            config = AppConfig.Load();
-            InitializeComponent();
+            config    = AppConfig.Load();
+            BackColor = SettingsWindow.BgMain;
+            ForeColor = SettingsWindow.TxtHigh;
+            Font      = new Font("Segoe UI", 10f);
+            Padding   = new Padding(0);
+
+            scrollHost = new CyberScrollPanel
+            {
+                Dock      = DockStyle.Fill,
+                BackColor = SettingsWindow.BgMain,
+                Padding   = new Padding(32, 28, 28, 32)
+            };
+            Controls.Add(scrollHost);
+
+            Build();
         }
 
-        private void InitializeComponent()
+        private void Build()
         {
-            this.BackColor = Color.White;
-            this.AutoScroll = true; // Enable scrolling for more content
-            
-            var title = new Label { Text = LocalizationManager.GetString("General"), Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(0, 0) };
-            var subtitle = new Label { Text = LocalizationManager.GetString("GeneralSettings"), Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(2, 40), ForeColor = Color.Gray };
+            int y = 20;
 
-            Controls.Add(title);
-            Controls.Add(subtitle);
+            // ── Heading ─────────────────────────────────────────────────────────
+            Add(new Label
+            {
+                Text      = "General Settings",
+                Font      = new Font("Segoe UI", 18f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                AutoSize  = true,
+                Location  = new Point(32, y)
+            });
+            y += 34;
 
-            int y = 80;
+            Add(new Label
+            {
+                Text      = "Configure system behavior, workspace preferences, and automatic sorting.",
+                Font      = new Font("Segoe UI", 9.5f),
+                ForeColor = SettingsWindow.TxtMuted,
+                BackColor = Color.Transparent,
+                AutoSize  = true,
+                Location  = new Point(32, y)
+            });
+            y += 40;
 
-            // === System Settings Section ===
-            var systemGroup = new GroupBox { Text = "System Settings", Location = new Point(0, y), Size = new Size(500, 200), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-            int groupY = 30;
+            // ── System Preferences Card ──────────────────────────────────────────
+            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 220);
+            int cy = 42;
 
-            // Language
-            systemGroup.Controls.Add(new Label { Text = LocalizationManager.GetString("Language"), Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10) });
-            var comboLang = new ComboBox { Location = new Point(180, groupY - 3), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+            // Language selector
+            sysCard.Controls.Add(CreateLabel("Interface Language", 20, cy + 3));
+            var comboLang = new CyberComboBox
+            {
+                Location = new Point(180, cy),
+                Width    = 180
+            };
             comboLang.Items.AddRange(new object[] { "English", "Español" });
             comboLang.SelectedIndex = config.Language == "Spanish" ? 1 : 0;
-            comboLang.SelectedIndexChanged += (s, e) => 
+            comboLang.SelectedIndexChanged += (s, e) =>
             {
-                var newLang = comboLang.SelectedIndex == 1 ? "Spanish" : "English";
-                if (config.Language != newLang)
-                {
-                    config.Language = newLang;
-                    config.Save();
-                    LocalizationManager.CurrentLanguage = newLang == "Spanish" ? LocalizationManager.Language.Spanish : LocalizationManager.Language.English;
-                    MessageBox.Show(newLang == "Spanish" ? "Reinicie la aplicación para aplicar los cambios." : "Please restart the application to apply changes.");
-                }
-            };
-            systemGroup.Controls.Add(comboLang);
-            groupY += 40;
-
-            // Startup
-            var chkStartup = new CheckBox { Text = LocalizationManager.GetString("StartWithWindows"), Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10) };
-            chkStartup.Checked = IsStartupEnabled();
-            chkStartup.CheckedChanged += (s, e) => SetStartup(chkStartup.Checked);
-            systemGroup.Controls.Add(chkStartup);
-            groupY += 35;
-
-            // Laptop Mode
-            var chkLaptop = new CheckBox { Text = LocalizationManager.GetString("LaptopMode") + " (Ahorro Batería)", Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10) };
-            chkLaptop.Checked = config.LaptopMode;
-            chkLaptop.CheckedChanged += (s, e) => 
-            {
-                config.LaptopMode = chkLaptop.Checked;
+                var lang = comboLang.SelectedIndex == 1 ? "Spanish" : "English";
+                if (config.Language == lang) return;
+                config.Language = lang;
                 config.Save();
-                MessageBox.Show(LocalizationManager.CurrentLanguage == LocalizationManager.Language.Spanish ? "Reinicie para aplicar cambios." : "Restart to apply changes.");
+                LocalizationManager.CurrentLanguage = lang == "Spanish"
+                    ? LocalizationManager.Language.Spanish : LocalizationManager.Language.English;
+                Info(lang == "Spanish" ? "Reinicie Universe para aplicar el cambio." : "Restart Universe to apply the language change.");
             };
-            systemGroup.Controls.Add(chkLaptop);
-            groupY += 35;
+            sysCard.Controls.Add(comboLang);
+            cy += 48;
 
-            // Enable Animations
-            var chkAnimate = new CheckBox { Text = "Enable Animations", Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10), Checked = config.EnableAnimations };
-            chkAnimate.CheckedChanged += (s, e) => { config.EnableAnimations = chkAnimate.Checked; config.Save(); };
-            systemGroup.Controls.Add(chkAnimate);
+            CreateToggleRow(sysCard, "Start Universe with Windows", IsStartupEnabled(), ref cy, on => SetStartup(on));
+            CreateToggleRow(sysCard, "Laptop Mode (disables blur to maximize battery)", config.LaptopMode, ref cy,
+                on => { config.LaptopMode = on; config.Save(); Info("Restart to apply Laptop Mode."); });
+            CreateToggleRow(sysCard, "Smooth Hardware Animations", config.EnableAnimations, ref cy,
+                on => { config.EnableAnimations = on; config.Save(); });
 
-            Controls.Add(systemGroup);
-            y += 210;
+            // ── Workspace Features Card ──────────────────────────────────────────
+            var featCard = CreateGlassCard("WORKSPACE FEATURES", ref y, 136);
+            cy = 42;
+            CreateToggleRow(featCard, "Smart Sorter (auto-organize files by rules and types)", config.EnableSmartSorter, ref cy,
+                on => { config.EnableSmartSorter = on; config.Save(); Info("Smart Sorter " + (on ? "enabled" : "disabled") + ". Restart to apply."); });
+            CreateToggleRow(featCard, "Desktop Notifications & File Activity Alerts", config.ShowNotifications, ref cy,
+                on => { config.ShowNotifications = on; config.Save(); });
 
-            // === Features Section ===
-            var featuresGroup = new GroupBox { Text = "Features", Location = new Point(0, y), Size = new Size(500, 120), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-            groupY = 30;
+            // ── Workspace Management Card ────────────────────────────────────────
+            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 140);
+            cy = 42;
 
-            // Smart Sorter
-            var chkSorter = new CheckBox { Text = "Enable Smart Sorter (Auto-organize files)", Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10), Checked = config.EnableSmartSorter };
-            chkSorter.CheckedChanged += (s, e) => 
+            var svc = NoFences.Core.DependencyInjection.GetRequiredService<IFenceService>();
+            var lblCount = new Label
             {
-                config.EnableSmartSorter = chkSorter.Checked;
-                config.Save();
-                MessageBox.Show("Smart Sorter " + (chkSorter.Checked ? "enabled" : "disabled") + ". Restart to apply.");
+                Text      = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)",
+                Location  = new Point(20, cy),
+                AutoSize  = true,
+                ForeColor = SettingsWindow.AccentNeon,
+                BackColor = Color.Transparent,
+                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold)
             };
-            featuresGroup.Controls.Add(chkSorter);
-            groupY += 35;
+            fenceCard.Controls.Add(lblCount);
+            cy += 34;
 
-            // Notifications
-            var chkNotify = new CheckBox { Text = "Show Notifications", Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10), Checked = config.ShowNotifications };
-            chkNotify.CheckedChanged += (s, e) => { config.ShowNotifications = chkNotify.Checked; config.Save(); };
-            featuresGroup.Controls.Add(chkNotify);
-            groupY += 35;
+            var btnNew = CreateCyberButton("＋  New Fence", SettingsWindow.AccentNeon, new Point(20, cy), 130);
+            btnNew.Click += (s, e) => { svc.CreateFence("New Fence"); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            fenceCard.Controls.Add(btnNew);
 
-            Controls.Add(featuresGroup);
-            y += 130;
-
-            // === Fence Management Section ===
-            var fenceGroup = new GroupBox { Text = "Fence Management", Location = new Point(0, y), Size = new Size(500, 140), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-            groupY = 30;
-
-            // Fence Count Display
-            var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
-            var fenceCount = fenceService.GetAllFences().Count;
-            var lblFenceCount = new Label { Text = $"Active Fences: {fenceCount}", Location = new Point(20, groupY), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Italic), ForeColor = Color.DarkBlue };
-            fenceGroup.Controls.Add(lblFenceCount);
-            groupY += 30;
-
-            // New Fence Button
-            var btnCreate = new Button { Text = LocalizationManager.GetString("NewFence"), Location = new Point(20, groupY), Size = new Size(150, 35), FlatStyle = FlatStyle.System };
-            btnCreate.Click += (s, e) => 
+            var btnDel = CreateCyberButton("🗑  Delete All", SettingsWindow.AccentPink, new Point(160, cy), 130);
+            btnDel.Click += (s, e) =>
             {
-                fenceService.CreateFence("New Fence");
-                lblFenceCount.Text = $"Active Fences: {fenceService.GetAllFences().Count}";
+                var all = svc.GetAllFences();
+                if (all.Count == 0) { Info("No fences to delete."); return; }
+                if (MessageBox.Show($"Delete ALL {all.Count} fence(s)? This will remove the fence containers but keep your desktop files.",
+                    "Confirm Reset", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                foreach (var f in all.ToArray()) svc.RemoveFence(f);
+                lblCount.Text = "⚡  0 active fence workspace(s)";
             };
-            fenceGroup.Controls.Add(btnCreate);
+            fenceCard.Controls.Add(btnDel);
 
-            // Delete All Fences Button
-            var btnDeleteAll = new Button { Text = "Delete All Fences", Location = new Point(180, groupY), Size = new Size(150, 35), FlatStyle = FlatStyle.System, ForeColor = Color.DarkRed };
-            btnDeleteAll.Click += (s, e) =>
-            {
-                var allFences = fenceService.GetAllFences();
-                if (allFences.Count == 0)
-                {
-                    MessageBox.Show("No fences to delete.", "Delete All", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
+            // ── Application Maintenance Card ─────────────────────────────────────
+            var appCard = CreateGlassCard("MAINTENANCE & UPDATES", ref y, 140);
+            cy = 42;
 
-                var result = MessageBox.Show(
-                    $"Are you sure you want to delete ALL {allFences.Count} fences?\\n\\nThis action cannot be undone!",
-                    "Delete All Fences",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
+            var btnUpd = CreateCyberButton("⟳  Check Updates", SettingsWindow.AccentVio, new Point(20, cy), 140);
+            btnUpd.Click += (s, e) =>
+                NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>().CheckForUpdates(false);
+            appCard.Controls.Add(btnUpd);
 
-                if (result == DialogResult.Yes)
-                {
-                    foreach (var fence in allFences.ToArray())
-                    {
-                        fenceService.RemoveFence(fence);
-                    }
-                    lblFenceCount.Text = $"Active Fences: 0";
-                    MessageBox.Show("All fences deleted successfully.", "Delete All", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            };
-            fenceGroup.Controls.Add(btnDeleteAll);
+            var btnData = CreateCyberButton("📁  Data Folder", Color.FromArgb(70, 85, 120), new Point(170, cy), 130);
+            btnData.Click += (s, e) => Process.Start("explorer.exe",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NoFences"));
+            appCard.Controls.Add(btnData);
 
-            Controls.Add(fenceGroup);
-            y += 150;
-
-            // === Application Section ===
-            var appGroup = new GroupBox { Text = "Application", Location = new Point(0, y), Size = new Size(500, 140), Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-            groupY = 30;
-
-            // Check Updates Button
-            var btnUpdate = new Button { Text = "Check for Updates", Location = new Point(20, groupY), Size = new Size(150, 35), FlatStyle = FlatStyle.System };
-            btnUpdate.Click += (s, e) =>
-            {
-                var updateService = NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>();
-                updateService.CheckForUpdates(false);
-            };
-            appGroup.Controls.Add(btnUpdate);
-
-            // Data Folder
-            var btnData = new Button { Text = LocalizationManager.GetString("OpenDataFolder"), Location = new Point(180, groupY), Size = new Size(150, 35), FlatStyle = FlatStyle.System };
-            btnData.Click += (s, e) => Process.Start("explorer.exe", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NoFences"));
-            appGroup.Controls.Add(btnData);
-            groupY += 45;
-
-            // Restart
-            var btnRestart = new Button { Text = LocalizationManager.GetString("RestartApp"), Location = new Point(20, groupY), Size = new Size(150, 35), FlatStyle = FlatStyle.System };
+            var btnRestart = CreateCyberButton("↺  Restart App", Color.FromArgb(70, 85, 120), new Point(310, cy), 130);
             btnRestart.Click += (s, e) => { Application.Restart(); Environment.Exit(0); };
-            appGroup.Controls.Add(btnRestart);
+            appCard.Controls.Add(btnRestart);
 
-            Controls.Add(appGroup);
+            scrollHost.UpdateLayout();
         }
+
+        private Panel CreateGlassCard(string title, ref int y, int height)
+        {
+            var card = new Panel
+            {
+                Location  = new Point(32, y),
+                Size      = new Size(580, height),
+                BackColor = SettingsWindow.BgCard,
+                Padding   = new Padding(20, 14, 20, 14)
+            };
+
+            card.Paint += (s, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                var rect = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
+
+                // Rounded Glass background
+                using (var bgBrush = new SolidBrush(SettingsWindow.BgCard))
+                using (var path = CreateRoundRect(rect, 10))
+                {
+                    g.FillPath(bgBrush, path);
+                }
+
+                // Glass Border
+                using (var pen = new Pen(SettingsWindow.BorderCard, 1f))
+                using (var path = CreateRoundRect(rect, 10))
+                {
+                    g.DrawPath(pen, path);
+                }
+
+                // Top Specular Highlight
+                using (var pen = new Pen(Color.FromArgb(25, 255, 255, 255), 1f))
+                {
+                    g.DrawLine(pen, 12, 1, card.Width - 12, 1);
+                }
+
+                // Title Tag
+                using (var font = new Font("Segoe UI", 8f, FontStyle.Bold))
+                using (var titleBrush = new SolidBrush(SettingsWindow.AccentNeon))
+                {
+                    g.DrawString(title, font, titleBrush, new PointF(20, 14));
+                }
+            };
+
+            Add(card);
+            y += height + 24;
+            return card;
+        }
+
+        private void CreateToggleRow(Panel parent, string label, bool initial, ref int cy, Action<bool> onChange)
+        {
+            var toggle = new ToggleSwitch
+            {
+                Checked  = initial,
+                Location = new Point(20, cy)
+            };
+            var lbl = new Label
+            {
+                Text      = label,
+                Location  = new Point(76, cy + 3),
+                AutoSize  = true,
+                ForeColor = initial ? SettingsWindow.TxtHigh : SettingsWindow.TxtMid,
+                BackColor = Color.Transparent,
+                Font      = new Font("Segoe UI", 9.5f)
+            };
+            toggle.CheckedChanged += (s, e) =>
+            {
+                lbl.ForeColor = toggle.Checked ? SettingsWindow.TxtHigh : SettingsWindow.TxtMid;
+                onChange(toggle.Checked);
+            };
+            parent.Controls.Add(toggle);
+            parent.Controls.Add(lbl);
+            cy += 38;
+        }
+
+        private Label CreateLabel(string text, int x, int y) => new Label
+        {
+            Text      = text,
+            Location  = new Point(x, y),
+            AutoSize  = true,
+            ForeColor = SettingsWindow.TxtMid,
+            BackColor = Color.Transparent,
+            Font      = new Font("Segoe UI", 9.5f)
+        };
+
+        private Button CreateCyberButton(string text, Color accent, Point loc, int width)
+        {
+            var b = new Button
+            {
+                Text      = text,
+                Location  = loc,
+                Size      = new Size(width, 36),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(28, 32, 50),
+                ForeColor = Color.White,
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+                Cursor    = Cursors.Hand
+            };
+            b.FlatAppearance.BorderColor        = accent;
+            b.FlatAppearance.BorderSize         = 1;
+            b.FlatAppearance.MouseOverBackColor = Color.FromArgb(
+                Math.Min(255, accent.R / 4 + 28),
+                Math.Min(255, accent.G / 4 + 32),
+                Math.Min(255, accent.B / 4 + 50));
+            return b;
+        }
+
+        private void Add(Control c) => scrollHost.Controls.Add(c);
+
+        private void Info(string msg) =>
+            MessageBox.Show(msg, "Universe", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         private bool IsStartupEnabled()
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RunKey, false))
+            try
             {
-                return key?.GetValue(AppName) != null;
+                using (var key = Registry.CurrentUser.OpenSubKey(RunKey, false))
+                    return key?.GetValue(AppName) != null;
             }
+            catch { return false; }
         }
 
         private void SetStartup(bool enable)
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true))
+            try
             {
-                if (enable)
+                using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true))
                 {
-                    key.SetValue(AppName, Application.ExecutablePath);
-                }
-                else
-                {
-                    key.DeleteValue(AppName, false);
+                    if (enable) key?.SetValue(AppName, Application.ExecutablePath);
+                    else key?.DeleteValue(AppName, false);
                 }
             }
+            catch { }
+        }
+
+        private static GraphicsPath CreateRoundRect(Rectangle r, int radius)
+        {
+            var path = new GraphicsPath();
+            int d = radius * 2;
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }

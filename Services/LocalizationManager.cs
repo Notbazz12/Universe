@@ -21,6 +21,9 @@ namespace NoFences.Services
             { "LockFences", new Dictionary<Language, string> { { Language.English, "Lock Fences" }, { Language.Spanish, "Bloquear Fences" } } },
             { "Minify", new Dictionary<Language, string> { { Language.English, "Minify" }, { Language.Spanish, "Minimizar" } } },
             { "View", new Dictionary<Language, string> { { Language.English, "View" }, { Language.Spanish, "Ver" } } },
+            { "SortBy", new Dictionary<Language, string> { { Language.English, "Sort By" }, { Language.Spanish, "Ordenar por" } } },
+            { "RenameFence", new Dictionary<Language, string> { { Language.English, "Rename..." }, { Language.Spanish, "Renombrar..." } } },
+            { "RemoveFence", new Dictionary<Language, string> { { Language.English, "Remove Fence" }, { Language.Spanish, "Eliminar Fence" } } },
             { "CustomizeHeaders", new Dictionary<Language, string> { { Language.English, "Customize Headers" }, { Language.Spanish, "Personalizar Encabezados" } } },
             { "ShowHeader", new Dictionary<Language, string> { { Language.English, "Show Header" }, { Language.Spanish, "Mostrar Encabezado" } } },
             { "Alignment", new Dictionary<Language, string> { { Language.English, "Alignment:" }, { Language.Spanish, "Alineación:" } } },
@@ -35,11 +38,14 @@ namespace NoFences.Services
             { "Description", new Dictionary<Language, string> { { Language.English, "A modern, lightweight desktop fence application." }, { Language.Spanish, "Una aplicación moderna y ligera para organizar el escritorio." } } },
             { "VisitGithub", new Dictionary<Language, string> { { Language.English, "Visit GitHub Repository" }, { Language.Spanish, "Visitar repositorio GitHub" } } },
             
-            // Tray Icon
+            // Tray Icon & Application Exit
             { "NewFence", new Dictionary<Language, string> { { Language.English, "New Fence" }, { Language.Spanish, "Nuevo Fence" } } },
             { "ShowFences", new Dictionary<Language, string> { { Language.English, "Show Fences" }, { Language.Spanish, "Mostrar Fences" } } },
             { "HideFences", new Dictionary<Language, string> { { Language.English, "Hide Fences" }, { Language.Spanish, "Ocultar Fences" } } },
             { "Exit", new Dictionary<Language, string> { { Language.English, "Exit" }, { Language.Spanish, "Salir" } } },
+            { "ExitUniverse", new Dictionary<Language, string> { { Language.English, "Exit Universe" }, { Language.Spanish, "Cerrar Universe" } } },
+            { "RemoveItem", new Dictionary<Language, string> { { Language.English, "Remove from this Fence" }, { Language.Spanish, "Quitar de este Fence" } } },
+            { "ConfirmExit", new Dictionary<Language, string> { { Language.English, "Are you sure you want to close Universe?" }, { Language.Spanish, "¿Estás seguro de que deseas cerrar Universe?" } } },
             
             // Laptop Mode
             { "LaptopMode", new Dictionary<Language, string> { { Language.English, "Laptop Mode (Save Battery)" }, { Language.Spanish, "Modo Portátil (Ahorro Batería)" } } }

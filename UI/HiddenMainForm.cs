@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using NoFences.Model;
 using NoFences.Services;
 
 namespace NoFences.UI
@@ -33,7 +34,12 @@ namespace NoFences.UI
             base.OnLoad(e);
             this.Visible = false;
             _loggingService.LogInfo("HiddenMainForm loaded");
-            _smartSorterService.Start();
+
+            var config = AppConfig.Load();
+            if (config.EnableSmartSorter)
+            {
+                _smartSorterService.Start();
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

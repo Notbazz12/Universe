@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NoFences.Core;
 using NoFences.Services;
@@ -27,7 +27,6 @@ namespace NoFences.Model
 
         private FenceManager()
         {
-            // Get service from DI container
             _fenceService = DependencyInjection.GetRequiredService<IFenceService>();
         }
 
@@ -59,6 +58,16 @@ namespace NoFences.Model
         public FenceInfo GetFence(Guid id)
         {
             return _fenceService.GetFence(id);
+        }
+
+        public void ReloadFence(Guid id)
+        {
+            _fenceService.ReloadFence(id);
+        }
+
+        public void SetAllFencesVisible(bool visible)
+        {
+            _fenceService.SetAllFencesVisible(visible);
         }
     }
 }

@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <AssemblyName>Universe</AssemblyName>
+    <RootNamespace>NoFences</RootNamespace>
     <ApplicationIcon>universe.ico</ApplicationIcon>
     <UseWindowsForms>true</UseWindowsForms>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>

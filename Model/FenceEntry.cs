@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System;
@@ -14,7 +14,11 @@ namespace NoFences.Model
 
         public EntryType Type { get; }
 
-        public string Name => System.IO.Path.GetFileNameWithoutExtension(Path);
+        public string Name => Type == EntryType.Folder 
+            ? System.IO.Path.GetFileName(Path) 
+            : System.IO.Path.GetFileNameWithoutExtension(Path);
+
+        private Icon _cachedIcon;
 
         private FenceEntry(string path, EntryType type)
         {
@@ -24,6 +28,8 @@ namespace NoFences.Model
 
         public static FenceEntry FromPath(string path)
         {
+            if (string.IsNullOrEmpty(path)) return null;
+
             if (File.Exists(path))
                 return new FenceEntry(path, EntryType.File);
             else if (Directory.Exists(path))
@@ -33,29 +39,47 @@ namespace NoFences.Model
 
         public Icon ExtractIcon(ThumbnailProvider thumbnailProvider)
         {
-            if (Type == EntryType.File)
-            {
-                if (thumbnailProvider.IsSupported(Path))
-                    return thumbnailProvider.GenerateThumbnail(Path);
-                else
-                    return Icon.ExtractAssociatedIcon(Path);
-            }
-            else
+            if (Type == EntryType.Folder)
             {
                 return IconUtil.FolderLarge;
             }
+
+            if (thumbnailProvider != null && thumbnailProvider.IsSupported(Path))
+            {
+                return thumbnailProvider.GenerateThumbnail(Path);
+            }
+
+            // Cache standard file icons to prevent disk/registry I/O on every frame
+            if (_cachedIcon == null)
+            {
+                try
+                {
+                    if (File.Exists(Path))
+                        _cachedIcon = Icon.ExtractAssociatedIcon(Path);
+                }
+                catch
+                {
+                    // Fallback
+                }
+            }
+
+            return _cachedIcon;
+        }
+
+        public void InvalidateIcon()
+        {
+            _cachedIcon = null;
         }
 
         public void Open()
         {
             Task.Run(() =>
             {
-                // start asynchronously
                 try
                 {
-                    if (Type == EntryType.File)
-                        Process.Start(Path);
-                    else if (Type == EntryType.Folder)
+                    if (Type == EntryType.File && File.Exists(Path))
+                        Process.Start(new ProcessStartInfo(Path) { UseShellExecute = true });
+                    else if (Type == EntryType.Folder && Directory.Exists(Path))
                         Process.Start("explorer.exe", Path);
                 }
                 catch (Exception e)

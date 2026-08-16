@@ -1,45 +1,39 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace NoFences.Win32
 {
     public class DesktopUtil
     {
-        private const Int32 GWL_STYLE = -16;
-        private const Int32 GWL_HWNDPARENT = -8;
-        private const Int32 WS_MAXIMIZEBOX = 0x00010000;
-        private const Int32 WS_MINIMIZEBOX = 0x00020000;
-
-        [DllImport("User32.dll", EntryPoint = "GetWindowLong")]
-        private extern static Int32 GetWindowLongPtr(IntPtr hWnd, Int32 nIndex);
-
-        [DllImport("User32.dll", EntryPoint = "SetWindowLong")]
-        private extern static Int32 SetWindowLongPtr(IntPtr hWnd, Int32 nIndex, Int32 dwNewLong);
+        private const int GWL_STYLE = -16;
+        private const int GWL_HWNDPARENT = -8;
+        private const int WS_MAXIMIZEBOX = 0x00010000;
+        private const int WS_MINIMIZEBOX = 0x00020000;
 
         [DllImport("user32.dll", SetLastError = true)]
-        static extern int SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        private static extern IntPtr FindWindow(string lpWindowClass, string lpWindowName);
 
         [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindow(string lpWindowClass, string lpWindowName);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
-
+        private static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
 
         public static void PreventMinimize(IntPtr handle)
         {
-            Int32 windowStyle = GetWindowLongPtr(handle, GWL_STYLE);
-            SetWindowLongPtr(handle, GWL_STYLE, windowStyle & ~WS_MAXIMIZEBOX & ~WS_MINIMIZEBOX);
+            if (handle == IntPtr.Zero) return;
+            IntPtr currentStyle = WindowUtil.GetWindowLong(handle, GWL_STYLE);
+            long style = currentStyle.ToInt64();
+            style &= ~WS_MAXIMIZEBOX;
+            style &= ~WS_MINIMIZEBOX;
+            WindowUtil.SetWindowLong(handle, GWL_STYLE, new IntPtr(style));
         }
 
         public static void GlueToDesktop(IntPtr handle)
         {
+            if (handle == IntPtr.Zero) return;
             IntPtr nWinHandle = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null);
-            SetWindowLongPtr(handle, GWL_HWNDPARENT, nWinHandle.ToInt32());
-           
+            if (nWinHandle != IntPtr.Zero)
+            {
+                WindowUtil.SetWindowLong(handle, GWL_HWNDPARENT, nWinHandle);
+            }
         }
     }
 }

@@ -1,0 +1,79 @@
+name: Build and Release Universe
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet Packages
+        run: dotnet restore NoFences.csproj
+
+      - name: Build Solution (Release)
+        run: dotnet build NoFences.csproj -c Release
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+
+      - name: Compile Inno Setup Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      - name: Calculate SHA-256 Checksum
+        id: hash
+        shell: pwsh
+        run: |
+          $installerPath = "Installer/Universe_Setup_v2.0.0.exe"
+          $hash = (Get-FileHash $installerPath -Algorithm SHA256).Hash.ToLower()
+          echo "INSTALLER_HASH=$hash" >> $env:GITHUB_ENV
+          Write-Host "Computed SHA256: $hash"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Universe_Setup_v2.0.0
+          path: Installer/Universe_Setup_v2.0.0.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Installer/Universe_Setup_v2.0.0.exe
+          body: |
+            ## 🌌 Universe ${{ github.ref_name }} Release
+            
+            ### ✨ Features & Improvements:
+            - **Cyber-Glass & Iridescent Bubble Theme:** Obsidian glass with luminous neon accents.
+            - **Quick-Search (`Ctrl + F`):** Instant filtering and opening of files within any fence.
+            - **Performance & Fluidity:** Optimized GDI+ rendering pipeline with zero per-frame allocations.
+            - **Bug Fixes:** Resolved WinForms startup exceptions and complete application shutdown handling.
+            
+            ### 🔒 Integrity Checksum (SHA-256):
+            ```
+            ${{ env.INSTALLER_HASH }}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

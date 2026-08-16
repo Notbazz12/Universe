@@ -32,7 +32,7 @@ namespace Peter
     ///    files[0] = new FileInfo(@"c:\windows\notepad.exe");
     ///    scm.ShowContextMenu(this.Handle, files, Cursor.Position);
     /// </example>
-    public class ShellContextMenu : NativeWindow
+    public class ShellContextMenu : NativeWindow, IDisposable
     {
         #region Constructor
         /// <summary>Default constructor</summary>
@@ -46,7 +46,22 @@ namespace Peter
         /// <summary>Ensure all resources get released</summary>
         ~ShellContextMenu()
         {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
             ReleaseAll();
+            if (this.Handle != IntPtr.Zero)
+            {
+                try { this.DestroyHandle(); } catch { }
+            }
         }
         #endregion
 
@@ -164,7 +179,7 @@ namespace Peter
         /// <summary>
         /// Release all allocated interfaces, PIDLs 
         /// </summary>
-        private void ReleaseAll()
+        public void ReleaseAll()
         {
             if (null != _oContextMenu)
             {

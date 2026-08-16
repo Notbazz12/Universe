@@ -11,37 +11,56 @@ namespace NoFences.Model
         public string Language { get; set; } = "English";
         public bool LaptopMode { get; set; } = false;
 
-        // New configuration properties
+        // Configuration properties
         public bool EnableSmartSorter { get; set; } = true;
         public bool ShowNotifications { get; set; } = true;
         public int AutoSaveInterval { get; set; } = 5; // seconds
         public bool EnableAnimations { get; set; } = true;
+        public string UpdateUrl { get; set; } = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
         public Dictionary<string, string> SmartSorterRules { get; set; } = null;
 
+        private static readonly object _configLock = new object();
         private static string ConfigPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NoFences", "config.json");
 
         public static AppConfig Load()
         {
-            try
+            lock (_configLock)
             {
-                if (File.Exists(ConfigPath))
+                try
                 {
-                    return JsonConvert.DeserializeObject<AppConfig>(File.ReadAllText(ConfigPath));
+                    if (File.Exists(ConfigPath))
+                    {
+                        var json = File.ReadAllText(ConfigPath);
+                        var cfg = JsonConvert.DeserializeObject<AppConfig>(json);
+                        if (cfg != null) return cfg;
+                    }
                 }
+                catch { }
+                return new AppConfig();
             }
-            catch { }
-            return new AppConfig();
         }
 
         public void Save()
         {
-            try
+            lock (_configLock)
             {
-                var dir = Path.GetDirectoryName(ConfigPath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.WriteAllText(ConfigPath, JsonConvert.SerializeObject(this, Formatting.Indented));
+                try
+                {
+                    var dir = Path.GetDirectoryName(ConfigPath);
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                    var tempPath = ConfigPath + ".tmp";
+                    var json = JsonConvert.SerializeObject(this, Formatting.Indented);
+                    File.WriteAllText(tempPath, json);
+
+                    if (File.Exists(ConfigPath))
+                    {
+                        File.Delete(ConfigPath);
+                    }
+                    File.Move(tempPath, ConfigPath);
+                }
+                catch { }
             }
-            catch { }
         }
     }
 }

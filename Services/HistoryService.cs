@@ -63,7 +63,6 @@ namespace NoFences.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"History: Failed to undo action {action.Type}", ex);
-                // Re-add to undo stack if failed
                 undoStack.Push(action);
                 redoStack.Pop();
             }
@@ -88,7 +87,6 @@ namespace NoFences.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"History: Failed to redo action {action.Type}", ex);
-                // Re-add to redo stack if failed
                 redoStack.Push(action);
                 undoStack.Pop();
             }
@@ -108,7 +106,8 @@ namespace NoFences.Services
 
         private void ApplyReverseAction(FenceAction action)
         {
-            var fence = _fenceService.GetAllFences().FirstOrDefault(f => f.Id.ToString() == action.FenceId);
+            if (!Guid.TryParse(action.FenceId, out var fenceId)) return;
+            var fence = _fenceService.GetFence(fenceId);
             if (fence == null) return;
 
             switch (action.Type)
@@ -127,18 +126,19 @@ namespace NoFences.Services
                     break;
 
                 case FenceAction.ActionType.PropertyChanged:
-                    // Restore old value (simplified)
                     var prop = typeof(FenceInfo).GetProperty(action.PropertyName);
                     prop?.SetValue(fence, action.OldValue);
                     break;
             }
 
             _fenceService.UpdateFence(fence);
+            _fenceService.ReloadFence(fence.Id);
         }
 
         private void ApplyForwardAction(FenceAction action)
         {
-            var fence = _fenceService.GetAllFences().FirstOrDefault(f => f.Id.ToString() == action.FenceId);
+            if (!Guid.TryParse(action.FenceId, out var fenceId)) return;
+            var fence = _fenceService.GetFence(fenceId);
             if (fence == null) return;
 
             switch (action.Type)
@@ -163,6 +163,7 @@ namespace NoFences.Services
             }
 
             _fenceService.UpdateFence(fence);
+            _fenceService.ReloadFence(fence.Id);
         }
     }
 }
