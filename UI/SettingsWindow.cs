@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NoFences.Model;
+using NoFences.Services;
 using NoFences.Win32;
 
 namespace NoFences.UI
@@ -94,21 +95,28 @@ namespace NoFences.UI
             sidebar.Controls.Add(navPer);
             sidebar.Controls.Add(navAbt);
 
-            // Version Pill badge at bottom
-            var verBadge = new Panel
+            // Interactive Update Button at bottom of sidebar
+            var btnUpdateSidebar = new Button
             {
-                Dock   = DockStyle.Bottom,
-                Height = 36,
-                BackColor = Color.Transparent
+                Dock      = DockStyle.Bottom,
+                Height    = 40,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(24, 28, 44),
+                ForeColor = AccentNeon,
+                Font      = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                Text      = "⟳  Check Updates",
+                Cursor    = Cursors.Hand
             };
-            verBadge.Paint += (s, e) =>
+            btnUpdateSidebar.FlatAppearance.BorderColor        = Color.FromArgb(48, 56, 85);
+            btnUpdateSidebar.FlatAppearance.BorderSize         = 1;
+            btnUpdateSidebar.FlatAppearance.MouseOverBackColor = Color.FromArgb(35, 42, 68);
+            btnUpdateSidebar.Click += (s, e) =>
             {
-                var g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                var rect = new Rectangle(16, 4, verBadge.Width - 32, 26);
-                CyberGlassRenderer.RenderPillBadge(g, rect, "Universe v2.0.0", new Font("Segoe UI", 8f, FontStyle.Bold), AccentNeon);
+                btnUpdateSidebar.Text = "Checking...";
+                NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>().CheckForUpdates(false);
+                btnUpdateSidebar.Text = "⟳  Check Updates";
             };
-            sidebar.Controls.Add(verBadge);
+            sidebar.Controls.Add(btnUpdateSidebar);
 
             // ── Content Host ─────────────────────────────────────────────────────
             contentHost = new Panel

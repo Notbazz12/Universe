@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/releases/download/v2.0.0/Universe_Setup_v2.0.0.exe",
-  "sha256": "7dcc30f64eeaeeb91b554a8fe53c3545b41491ec777bb89e625e25b6d20cd20a",
-  "releaseNotes": "Universe v2.0.0: Redesigned modern Cyber-Glass Settings window, dark DWM title bar, custom glass scrollbars, glowing iridescent toggles, high-contrast typography, and smooth GDI+ rendering."
+  "version": "2.0.1",
+  "downloadUrl": "https://universe-update-server.onrender.com/Universe_Setup_v2.0.0.exe",
+  "sha256": "b59398f7fcd817dfd2b3a529bd94a1615c7f112b44eb9573ff52127e554e57e4",
+  "releaseNotes": "Universe v2.0.1: Added dedicated update button in sidebar, live cloud update integration, and security verification."
 }
