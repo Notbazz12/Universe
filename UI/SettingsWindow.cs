@@ -214,13 +214,13 @@ namespace NoFences.UI
 
         public NavItem(string text)
         {
-            _text     = text;
-            BackColor = Color.Transparent;
-            Cursor    = Cursors.Hand;
             SetStyle(ControlStyles.SupportsTransparentBackColor |
                      ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.AllPaintingInWmPaint  |
                      ControlStyles.UserPaint, true);
+            _text     = text;
+            BackColor = Color.Transparent;
+            Cursor    = Cursors.Hand;
         }
 
         protected override void OnMouseEnter(EventArgs e) { _hover = true;  Invalidate(); }
