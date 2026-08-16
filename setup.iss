@@ -18,10 +18,10 @@ DisableProgramGroupPage=yes
 OutputDir=Installer
 OutputBaseFilename=Universe_Setup_v{#MyAppVersion}
 SetupIconFile=universe.ico
-Compression=lzma
+Compression=lzma2/ultra64
 SolidCompression=yes
-CloseApplications=yes
-RestartApplications=yes
+CloseApplications=no
+RestartApplications=no
 WizardStyle=modern
 WizardImageFile=Installer\WizModernImage.bmp
 WizardSmallImageFile=Installer\WizModernSmallImage.bmp
@@ -54,14 +54,23 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 function DwmSetWindowAttribute(hwnd: HWND; dwAttribute: DWORD; var pvAttribute: Integer; cbAttribute: DWORD): Integer;
 external 'DwmSetWindowAttribute@dwmapi.dll stdcall delayload';
 
+// Kill previous process instantly before installing to avoid Windows Restart Manager lag
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/F /IM Universe.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('taskkill.exe', '/F /IM NoFences.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(150);
+  Result := '';
+end;
+
 procedure InitializeWizard();
 var
   DarkModeVal: Integer;
 begin
-  // Set Segoe UI font for clean modern look
   WizardForm.Font.Name := 'Segoe UI';
 
-  // Apply Windows 10/11 Immersive Dark Title Bar to the Installer Window
   try
     DarkModeVal := 1;
     if DwmSetWindowAttribute(WizardForm.Handle, 20, DarkModeVal, 4) <> 0 then

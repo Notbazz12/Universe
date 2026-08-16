@@ -155,15 +155,21 @@ namespace NoFences.Services
 
                 _loggingService.LogInfo("Installer downloaded. Starting installation...");
 
+                try
+                {
+                    var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<IFenceService>();
+                    fenceService?.CloseAllFences();
+                }
+                catch { }
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = tempPath,
-                    Arguments = "/SILENT", // Inno Setup silent flag
+                    Arguments = "/SILENT /SUPPRESSMSGBOXES",
                     UseShellExecute = true
                 });
 
-                // FIX: Application.Exit must run on the UI thread
-                RunOnUiThread(() => Application.Exit());
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
