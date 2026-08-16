@@ -17,7 +17,7 @@ namespace NoFences.Services
 
     public class UpdateService : IUpdateService
     {
-        private const string DefaultVersionUrl = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
+        private const string DefaultVersionUrl = "https://universe-update-server.onrender.com/version.json";
         private const string CurrentVersion = "2.0.0";
         private readonly ILoggingService _loggingService;
 
