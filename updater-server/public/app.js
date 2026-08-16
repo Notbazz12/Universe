@@ -94,13 +94,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 2. Fetch Live Version Manifest
+    // 2. Fetch Live Version Manifest and update Website Dynamically
     fetch('/version.json')
         .then(res => res.json())
         .then(data => {
             if (data && data.version) {
+                // Update all version badges
                 const badges = document.querySelectorAll('.badge-pill');
                 badges.forEach(b => b.textContent = `v${data.version}`);
+
+                // Update Hero Download Button
+                const downloadBtn = document.getElementById('downloadBtn');
+                if (downloadBtn) {
+                    const title = downloadBtn.querySelector('strong');
+                    if (title) title.textContent = `Download Universe v${data.version}`;
+                    if (data.downloadUrl) downloadBtn.href = data.downloadUrl;
+                }
+
+                // Update any other download links
+                const allDownloadLinks = document.querySelectorAll('a[href*="Universe_Setup"]');
+                allDownloadLinks.forEach(link => {
+                    if (data.downloadUrl) link.href = data.downloadUrl;
+                });
             }
         })
         .catch(() => {
