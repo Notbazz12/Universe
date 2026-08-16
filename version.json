@@ -1,6 +1,6 @@
 {
   "version": "2.0.1",
   "downloadUrl": "https://universe-update-server.onrender.com/Universe_Setup_v2.0.0.exe",
-  "sha256": "b59398f7fcd817dfd2b3a529bd94a1615c7f112b44eb9573ff52127e554e57e4",
-  "releaseNotes": "Universe v2.0.1: Added dedicated update button in sidebar, live cloud update integration, and security verification."
+  "sha256": "1272228e48a3be94b5f229e0be5bafc893f4f9b526f80f32727ccca715855c35",
+  "releaseNotes": "Universe v2.0.1: Redesigned modern Cyber-Glass installer wizard, dark DWM title bar, custom Segoe UI typography, and verified auto-updater."
 }
