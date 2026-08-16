@@ -1,6 +1,6 @@
 {
   "version": "2.0.1",
   "downloadUrl": "https://universe-update-server.onrender.com/Universe_Setup_v2.0.0.exe",
-  "sha256": "0923be0d8720bfa232b8b6f27bdb79d3c307dad39323eeeecbc40c68879c2661",
-  "releaseNotes": "Universe v2.0.1: Ultra-fast instant update installer with zero-delay process termination and Cyber-Glass style."
+  "sha256": "d71eced38c8845e455e29c0be0819930d5ee90eb68f642f2966f97a7d7b999c8",
+  "releaseNotes": "Universe v2.0.1: Added automatic post-update app launch, Cyber-Glass installer theme, and zero-delay process termination."
 }
