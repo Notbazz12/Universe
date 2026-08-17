@@ -73,7 +73,7 @@ namespace NoFences.UI.Pages
 
             appCard.Controls.Add(new Label
             {
-                Text      = "Version 2.0.0 (Cyber-Glass & Iridescent Bubble Edition)",
+                Text      = $"Version {UpdateService.CurrentVersion} (Cyber-Glass & Iridescent Bubble Edition)",
                 Location  = new Point(20, cy),
                 AutoSize  = true,
                 Font      = new Font("Segoe UI", 9.5f),

@@ -1,6 +1,6 @@
 {
-  "version": "2.0.1",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.0.exe",
-  "sha256": "6cf2ea9c469b30ad004ac568b51a2558c7083ee64adf614f4b8f4be8c1a91c73",
-  "releaseNotes": "Universe v2.0.1: Fluid scrolling and responsive glass cards."
+  "version": "2.0.2",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.2.exe",
+  "sha256": "d64a524440ee6e9e6c5f0af4dc9223d931c1d219e272588b2f10184f635947c0",
+  "releaseNotes": "Universe v2.0.2: Fluid mouse-wheel scrolling, responsive layout, and zero-lag 144 FPS engine."
 }
