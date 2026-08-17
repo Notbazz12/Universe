@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+    <defs>
+        <linearGradient id="universeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00F5D4" />
+            <stop offset="50%" stop-color="#8B5CF6" />
+            <stop offset="100%" stop-color="#F43F5E" />
+        </linearGradient>
+        <radialGradient id="haloGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#00F5D4" stop-opacity="0.6"/>
+            <stop offset="60%" stop-color="#8B5CF6" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#080A0F" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+    </defs>
+    
+    <!-- Dark Capsule Background -->
+    <rect width="64" height="64" rx="16" fill="#0D1018" />
+    <rect width="62" height="62" x="1" y="1" rx="15" stroke="url(#universeGrad)" stroke-width="1.5" stroke-opacity="0.5" />
+    
+    <!-- Subtle Ambient Center Halo -->
+    <circle cx="32" cy="32" r="22" fill="url(#haloGrad)" />
+
+    <!-- Orbital Cyber Ring -->
+    <ellipse cx="32" cy="32" rx="20" ry="8" transform="rotate(-30 32 32)" stroke="url(#universeGrad)" stroke-width="2" stroke-dasharray="32 10" opacity="0.85" />
+
+    <!-- 4-Pointed Pulsar Star / Universe Core -->
+    <path d="M32 12 C32 23 23 32 12 32 C23 32 32 41 32 52 C32 41 41 32 52 32 C41 32 32 23 32 12 Z" fill="url(#universeGrad)" filter="url(#glow)" />
+    
+    <!-- Central Bright Core Sparkle -->
+    <circle cx="32" cy="32" r="3.5" fill="#FFFFFF" />
+</svg>

@@ -134,17 +134,15 @@ body {
     letter-spacing: 0.06em;
 }
 
-.logo-sparkle {
-    color: var(--neon-cyan);
-    font-size: 1.4rem;
-    filter: drop-shadow(0 0 8px var(--neon-cyan));
-    animation: sparkleSpin 8s linear infinite;
+.brand-icon {
+    width: 28px;
+    height: 28px;
+    filter: drop-shadow(0 0 10px rgba(0, 245, 212, 0.5));
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes sparkleSpin {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(180deg) scale(1.2); }
-    100% { transform: rotate(360deg) scale(1); }
+.brand-logo:hover .brand-icon {
+    transform: rotate(15deg) scale(1.12);
 }
 
 .badge-pill {
