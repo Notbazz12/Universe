@@ -20,8 +20,7 @@ namespace NoFences.UI
         private bool _isHoveringScrollbar = false;
 
         private const int WM_MOUSEWHEEL = 0x020A;
-        private const int SCROLLBAR_WIDTH = 8;
-        private const int HIT_AREA_WIDTH = 22;
+        private const int SCROLLBAR_TRACK_WIDTH = 16;
 
         public CyberScrollPanel()
         {
@@ -35,9 +34,9 @@ namespace NoFences.UI
 
             _content = new Panel
             {
-                BackColor = Color.Transparent,
+                BackColor = Color.FromArgb(15, 17, 26),
                 Location = new Point(0, 0),
-                Width = Width,
+                Width = Math.Max(100, Width - SCROLLBAR_TRACK_WIDTH),
                 Height = Height
             };
             base.Controls.Add(_content);
@@ -65,6 +64,12 @@ namespace NoFences.UI
         public void ClearHostControls()
         {
             _content.Controls.Clear();
+            _scrollOffset = 0;
+            RecalculateLayout();
+        }
+
+        public void UpdateLayout()
+        {
             RecalculateLayout();
         }
 
@@ -72,11 +77,6 @@ namespace NoFences.UI
         {
             _scrollOffset = 0;
             ApplyScroll();
-        }
-
-        public void UpdateLayout()
-        {
-            RecalculateLayout();
         }
 
         protected override void OnResize(EventArgs eventargs)
@@ -90,7 +90,8 @@ namespace NoFences.UI
             if (Width <= 0 || Height <= 0) return;
 
             int totalHeight = 0;
-            int maxContentWidth = Width - 20;
+            int availableContentWidth = Math.Max(100, Width - SCROLLBAR_TRACK_WIDTH);
+            _content.Width = availableContentWidth;
 
             foreach (Control c in _content.Controls)
             {
@@ -102,19 +103,17 @@ namespace NoFences.UI
             }
 
             totalHeight += 40; // bottom padding
-            _content.Width = Width;
             _content.Height = Math.Max(Height, totalHeight);
 
             _maxScroll = Math.Max(0, totalHeight - Height);
             _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
 
             ApplyScroll();
-            Invalidate();
         }
 
         private void ApplyScroll()
         {
-            _content.Top = -_scrollOffset;
+            _content.Location = new Point(0, -_scrollOffset);
             Invalidate();
         }
 
@@ -131,12 +130,12 @@ namespace NoFences.UI
                     int wParam = (int)(long)m.WParam;
                     int delta = (short)((wParam >> 16) & 0xFFFF);
 
-                    int step = 48;
+                    int step = 55;
                     _scrollOffset -= Math.Sign(delta) * step;
                     _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
 
                     ApplyScroll();
-                    return true; // Message handled
+                    return true; // Swallowed and handled smoothly
                 }
             }
             return false;
@@ -145,7 +144,7 @@ namespace NoFences.UI
         protected override void OnMouseMove(MouseEventArgs e)
         {
             bool wasHovering = _isHoveringScrollbar;
-            _isHoveringScrollbar = _maxScroll > 0 && e.X >= Width - HIT_AREA_WIDTH;
+            _isHoveringScrollbar = _maxScroll > 0 && e.X >= Width - SCROLLBAR_TRACK_WIDTH;
 
             if (_isDraggingScroll)
             {
@@ -172,7 +171,7 @@ namespace NoFences.UI
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && _maxScroll > 0 && e.X >= Width - HIT_AREA_WIDTH)
+            if (e.Button == MouseButtons.Left && _maxScroll > 0 && e.X >= Width - SCROLLBAR_TRACK_WIDTH)
             {
                 _isDraggingScroll = true;
                 _dragStartY = e.Y;
@@ -212,9 +211,9 @@ namespace NoFences.UI
             var thumbRect = new Rectangle(thumbX, thumbY, thumbWidth, thumbHeight);
 
             // Sleek Iridescent / Neon Thumb
-            Color thumbColor = _isDraggingScroll ? Color.FromArgb(220, 0, 245, 212) :
-                               _isHoveringScrollbar ? Color.FromArgb(180, 139, 92, 246) :
-                               Color.FromArgb(100, 100, 120, 160);
+            Color thumbColor = _isDraggingScroll ? Color.FromArgb(240, 0, 245, 212) :
+                               _isHoveringScrollbar ? Color.FromArgb(200, 139, 92, 246) :
+                               Color.FromArgb(120, 100, 120, 170);
 
             using (var b = new SolidBrush(thumbColor))
             using (var path = CreateRoundRect(thumbRect, thumbWidth / 2))

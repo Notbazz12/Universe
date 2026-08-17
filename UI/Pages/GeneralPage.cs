@@ -159,12 +159,25 @@ namespace NoFences.UI.Pages
             scrollHost.UpdateLayout();
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            scrollHost.RecalculateLayout();
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            scrollHost.RecalculateLayout();
+        }
+
         private Panel CreateGlassCard(string title, ref int y, int height)
         {
             var card = new Panel
             {
                 Location  = new Point(32, y),
-                Size      = new Size(580, height),
+                Size      = new Size(Math.Max(500, Width - 80), height),
+                Anchor    = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
                 BackColor = SettingsWindow.BgCard,
                 Padding   = new Padding(20, 14, 20, 14)
             };

@@ -1,6 +1,6 @@
 {
   "version": "2.0.1",
   "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.0.exe",
-  "sha256": "addcc4b2bad0d51c8e95e40ebe2719bec0beaac4e96708f02df5a71db80aada1",
-  "releaseNotes": "Universe v2.0.1: Fixed mouse wheel scrolling on settings page with smooth CyberScrollPanel."
+  "sha256": "6cf2ea9c469b30ad004ac568b51a2558c7083ee64adf614f4b8f4be8c1a91c73",
+  "releaseNotes": "Universe v2.0.1: Fluid scrolling and responsive glass cards."
 }
