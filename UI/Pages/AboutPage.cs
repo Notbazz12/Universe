@@ -203,7 +203,7 @@ namespace NoFences.UI.Pages
             return b;
         }
 
-        private void Add(Control c) => scrollHost.Controls.Add(c);
+        private void Add(Control c) => scrollHost.AddHostControl(c);
 
         private static GraphicsPath CreateRoundRect(Rectangle r, int radius)
         {

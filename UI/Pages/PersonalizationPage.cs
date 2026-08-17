@@ -376,7 +376,7 @@ namespace NoFences.UI.Pages
             Font      = new Font("Segoe UI", 9.5f)
         };
 
-        private void Add(Control c) => scrollHost.Controls.Add(c);
+        private void Add(Control c) => scrollHost.AddHostControl(c);
 
         private void RefreshPreview()
         {

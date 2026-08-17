@@ -1,6 +1,6 @@
 {
   "version": "2.0.1",
   "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.0.exe",
-  "sha256": "da76428463b051d72da321495108ef3e59ff01cbb7b872a3e8dacc423e1f8444",
-  "releaseNotes": "Universe v2.0.1: Supercharged 144+ FPS Cyber-Glass engine, zero-lag hover, and micro-animations."
+  "sha256": "addcc4b2bad0d51c8e95e40ebe2719bec0beaac4e96708f02df5a71db80aada1",
+  "releaseNotes": "Universe v2.0.1: Fixed mouse wheel scrolling on settings page with smooth CyberScrollPanel."
 }

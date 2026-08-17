@@ -268,7 +268,7 @@ namespace NoFences.UI.Pages
             return b;
         }
 
-        private void Add(Control c) => scrollHost.Controls.Add(c);
+        private void Add(Control c) => scrollHost.AddHostControl(c);
 
         private void Info(string msg) =>
             MessageBox.Show(msg, "Universe", MessageBoxButtons.OK, MessageBoxIcon.Information);

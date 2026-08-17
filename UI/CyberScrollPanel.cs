@@ -6,17 +6,22 @@ using System.Windows.Forms;
 namespace NoFences.UI
 {
     /// <summary>
-    /// A sleek container that replaces WinForms ugly white AutoScroll scrollbars
-    /// with a modern, smooth, floating Cyber-Glass scrollbar.
+    /// A sleek, high-performance scroll container that replaces WinForms white scrollbars
+    /// with a modern floating Cyber-Glass scrollbar. Supports global mouse wheel over all child controls.
     /// </summary>
-    public class CyberScrollPanel : Panel
+    public class CyberScrollPanel : Panel, IMessageFilter
     {
+        private readonly Panel _content;
         private int _scrollOffset = 0;
         private int _maxScroll = 0;
         private bool _isDraggingScroll = false;
         private int _dragStartY = 0;
         private int _dragStartOffset = 0;
         private bool _isHoveringScrollbar = false;
+
+        private const int WM_MOUSEWHEEL = 0x020A;
+        private const int SCROLLBAR_WIDTH = 8;
+        private const int HIT_AREA_WIDTH = 22;
 
         public CyberScrollPanel()
         {
@@ -27,92 +32,125 @@ namespace NoFences.UI
 
             AutoScroll = false;
             BackColor = Color.FromArgb(15, 17, 26);
+
+            _content = new Panel
+            {
+                BackColor = Color.Transparent,
+                Location = new Point(0, 0),
+                Width = Width,
+                Height = Height
+            };
+            base.Controls.Add(_content);
+
+            Application.AddMessageFilter(this);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                try { Application.RemoveMessageFilter(this); } catch { }
+            }
+            base.Dispose(disposing);
+        }
+
+        public Control.ControlCollection HostControls => _content.Controls;
+
+        public void AddHostControl(Control c)
+        {
+            _content.Controls.Add(c);
+            RecalculateLayout();
+        }
+
+        public void ClearHostControls()
+        {
+            _content.Controls.Clear();
+            RecalculateLayout();
         }
 
         public void ScrollToTop()
         {
             _scrollOffset = 0;
-            LayoutChildren();
-            Invalidate();
+            ApplyScroll();
         }
 
         public void UpdateLayout()
         {
-            LayoutChildren();
-            Invalidate();
-        }
-
-        protected override void OnControlAdded(ControlEventArgs e)
-        {
-            base.OnControlAdded(e);
-            LayoutChildren();
-        }
-
-        protected override void OnControlRemoved(ControlEventArgs e)
-        {
-            base.OnControlRemoved(e);
-            LayoutChildren();
+            RecalculateLayout();
         }
 
         protected override void OnResize(EventArgs eventargs)
         {
             base.OnResize(eventargs);
-            LayoutChildren();
+            RecalculateLayout();
         }
 
-        protected override void OnMouseWheel(MouseEventArgs e)
+        public void RecalculateLayout()
         {
-            if (_maxScroll > 0)
-            {
-                _scrollOffset -= Math.Sign(e.Delta) * 38;
-                _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
-                LayoutChildren();
-                Invalidate();
-            }
-            base.OnMouseWheel(e);
-        }
+            if (Width <= 0 || Height <= 0) return;
 
-        private void LayoutChildren()
-        {
             int totalHeight = 0;
-            foreach (Control c in Controls)
+            int maxContentWidth = Width - 20;
+
+            foreach (Control c in _content.Controls)
             {
                 if (c.Visible)
                 {
-                    int bottom = c.Location.Y + _scrollOffset + c.Height + c.Margin.Bottom;
+                    int bottom = c.Location.Y + c.Height + c.Margin.Bottom;
                     if (bottom > totalHeight) totalHeight = bottom;
                 }
             }
 
-            _maxScroll = Math.Max(0, totalHeight - Height + 40);
+            totalHeight += 40; // bottom padding
+            _content.Width = Width;
+            _content.Height = Math.Max(Height, totalHeight);
+
+            _maxScroll = Math.Max(0, totalHeight - Height);
             _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
 
-            // Shift children based on _scrollOffset
-            SuspendLayout();
-            foreach (Control c in Controls)
+            ApplyScroll();
+            Invalidate();
+        }
+
+        private void ApplyScroll()
+        {
+            _content.Top = -_scrollOffset;
+            Invalidate();
+        }
+
+        public bool PreFilterMessage(ref Message m)
+        {
+            if (m.Msg == WM_MOUSEWHEEL && IsDisposed == false && Visible && _maxScroll > 0)
             {
-                if (c.Tag is Point originalLoc)
+                var screenPt = Cursor.Position;
+                var clientPt = PointToClient(screenPt);
+
+                if (ClientRectangle.Contains(clientPt))
                 {
-                    c.Location = new Point(originalLoc.X, originalLoc.Y - _scrollOffset);
-                }
-                else
-                {
-                    c.Tag = c.Location;
-                    c.Location = new Point(c.Location.X, c.Location.Y - _scrollOffset);
+                    // Extract delta (high word of wParam)
+                    int wParam = (int)(long)m.WParam;
+                    int delta = (short)((wParam >> 16) & 0xFFFF);
+
+                    int step = 48;
+                    _scrollOffset -= Math.Sign(delta) * step;
+                    _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
+
+                    ApplyScroll();
+                    return true; // Message handled
                 }
             }
-            ResumeLayout(true);
+            return false;
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             bool wasHovering = _isHoveringScrollbar;
-            _isHoveringScrollbar = _maxScroll > 0 && e.X >= Width - 14;
+            _isHoveringScrollbar = _maxScroll > 0 && e.X >= Width - HIT_AREA_WIDTH;
 
             if (_isDraggingScroll)
             {
                 int trackHeight = Height - 20;
-                int thumbHeight = Math.Max(30, (int)((float)Height / (_maxScroll + Height) * trackHeight));
+                int thumbHeight = Math.Max(36, (int)((float)Height / (_maxScroll + Height) * trackHeight));
                 int availableTrack = trackHeight - thumbHeight;
 
                 if (availableTrack > 0)
@@ -121,8 +159,7 @@ namespace NoFences.UI
                     float scrollRatio = delta / availableTrack;
                     _scrollOffset = (int)(_dragStartOffset + scrollRatio * _maxScroll);
                     _scrollOffset = Math.Max(0, Math.Min(_maxScroll, _scrollOffset));
-                    LayoutChildren();
-                    Invalidate();
+                    ApplyScroll();
                 }
             }
             else if (wasHovering != _isHoveringScrollbar)
@@ -135,12 +172,13 @@ namespace NoFences.UI
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && _maxScroll > 0 && e.X >= Width - 14)
+            if (e.Button == MouseButtons.Left && _maxScroll > 0 && e.X >= Width - HIT_AREA_WIDTH)
             {
                 _isDraggingScroll = true;
                 _dragStartY = e.Y;
                 _dragStartOffset = _scrollOffset;
                 Capture = true;
+                Invalidate();
             }
             base.OnMouseDown(e);
         }
@@ -166,7 +204,7 @@ namespace NoFences.UI
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
             int trackHeight = Height - 20;
-            int thumbHeight = Math.Max(32, (int)((float)Height / (_maxScroll + Height) * trackHeight));
+            int thumbHeight = Math.Max(36, (int)((float)Height / (_maxScroll + Height) * trackHeight));
             int thumbY = 10 + (int)((float)_scrollOffset / _maxScroll * (trackHeight - thumbHeight));
             int thumbWidth = _isHoveringScrollbar || _isDraggingScroll ? 6 : 4;
             int thumbX = Width - thumbWidth - 4;
@@ -174,9 +212,9 @@ namespace NoFences.UI
             var thumbRect = new Rectangle(thumbX, thumbY, thumbWidth, thumbHeight);
 
             // Sleek Iridescent / Neon Thumb
-            Color thumbColor = _isDraggingScroll ? Color.FromArgb(200, 0, 245, 212) :
-                               _isHoveringScrollbar ? Color.FromArgb(160, 139, 92, 246) :
-                               Color.FromArgb(90, 80, 95, 130);
+            Color thumbColor = _isDraggingScroll ? Color.FromArgb(220, 0, 245, 212) :
+                               _isHoveringScrollbar ? Color.FromArgb(180, 139, 92, 246) :
+                               Color.FromArgb(100, 100, 120, 160);
 
             using (var b = new SolidBrush(thumbColor))
             using (var path = CreateRoundRect(thumbRect, thumbWidth / 2))
