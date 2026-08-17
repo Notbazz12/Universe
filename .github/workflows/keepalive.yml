@@ -1,0 +1,16 @@
+name: Keep Server Alive 24/7
+
+on:
+  schedule:
+    # Runs every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Render Keep-Alive
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive HTTP Request
+        run: |
+          curl -sS --max-time 15 "https://universe-update-server.onrender.com/health" || echo "Server ping completed"
