@@ -65,7 +65,7 @@ namespace NoFences.UI.Pages
             y += 40;
 
             // ── System Preferences Card ──────────────────────────────────────────
-            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 260);
+            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 280);
             int cy = 42;
 
             // Language selector
