@@ -106,17 +106,6 @@ namespace NoFences
                     // Initialize error handling
                     errorHandlingService.Initialize();
 
-                    // Initialize update checker (silent on startup)
-                    try
-                    {
-                        var updateService = DependencyInjection.GetRequiredService<IUpdateService>();
-                        updateService.CheckForUpdates(true);
-                    }
-                    catch (Exception ex)
-                    {
-                        loggingService.LogWarning($"Update check failed: {ex.Message}");
-                    }
-
                     // Enable dark mode for context menus
                     WindowUtil.SetPreferredAppMode(1);
 
