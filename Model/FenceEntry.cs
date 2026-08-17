@@ -39,31 +39,36 @@ namespace NoFences.Model
 
         public Icon ExtractIcon(ThumbnailProvider thumbnailProvider)
         {
+            if (_cachedIcon != null)
+                return _cachedIcon;
+
             if (Type == EntryType.Folder)
             {
-                return IconUtil.FolderLarge;
+                _cachedIcon = IconUtil.FolderLarge;
+                return _cachedIcon;
             }
 
             if (thumbnailProvider != null && thumbnailProvider.IsSupported(Path))
             {
-                return thumbnailProvider.GenerateThumbnail(Path);
-            }
-
-            // Cache standard file icons to prevent disk/registry I/O on every frame
-            if (_cachedIcon == null)
-            {
                 try
                 {
-                    if (File.Exists(Path))
-                        _cachedIcon = Icon.ExtractAssociatedIcon(Path);
+                    _cachedIcon = thumbnailProvider.GenerateThumbnail(Path);
+                    if (_cachedIcon != null) return _cachedIcon;
                 }
-                catch
-                {
-                    // Fallback
-                }
+                catch { }
             }
 
-            return _cachedIcon;
+            try
+            {
+                if (File.Exists(Path))
+                    _cachedIcon = Icon.ExtractAssociatedIcon(Path);
+            }
+            catch
+            {
+                _cachedIcon = IconUtil.FileLarge;
+            }
+
+            return _cachedIcon ?? IconUtil.FileLarge;
         }
 
         public void InvalidateIcon()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universe · High-Performance Desktop Organizer for Windows</title>
+    <title>Universe · Next-Gen Desktop Organizer for Windows</title>
     <meta name="description" content="Organize your Windows desktop with obsidian Cyber-Glass & iridescent bubbles. A lightning fast, GPU-accelerated workspace organizer for Windows 10 & 11.">
     <meta name="keywords" content="Windows desktop organizer, Stardock Fences alternative, desktop fences, cyber glass, open source Windows customization">
     
@@ -20,6 +20,9 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Particle Starfield Canvas -->
+    <canvas id="particleCanvas"></canvas>
 
     <!-- Ambient Neon Lighting Background -->
     <div class="ambient-glow glow-cyan"></div>
@@ -38,12 +41,12 @@
             <nav class="nav-links">
                 <a href="#features">Features</a>
                 <a href="#interactive-demo">Live Demo</a>
-                <a href="#architecture">Tech Specs</a>
+                <a href="#stats">Performance</a>
                 <a href="https://github.com/Notbazz12/Universe" target="_blank" rel="noopener" class="github-link">
                     <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     GitHub
                 </a>
-                <a href="/Universe_Setup_v2.0.0.exe" class="btn-nav-download">
+                <a href="/Universe_Setup_v2.0.0.exe" class="btn-nav-download" id="navDownloadBtn">
                     Download Free
                 </a>
             </nav>
@@ -54,21 +57,21 @@
     <main>
         <section class="hero-section">
             <div class="hero-container">
-                <div class="hero-pill-tag">
+                <div class="hero-pill-tag floating-anim">
                     <span class="pulse-dot"></span>
                     Cyber-Glass & Iridescent Bubble Edition
                 </div>
 
-                <h1 class="hero-headline">
-                    Organize your Windows Desktop with <span class="gradient-text">Cyber-Glass Aesthetics</span>.
+                <h1 class="hero-headline reveal-init">
+                    Organize your Windows Desktop with <span class="gradient-text animated-gradient">Cyber-Glass Aesthetics</span>.
                 </h1>
 
-                <p class="hero-subtext">
+                <p class="hero-subtext reveal-init">
                     A lightning-fast, GPU-accelerated desktop fence engine for Windows 10 & 11. Say goodbye to cluttered desktop icons with liquid iridescent floating bubbles, instant search, and zero background lag.
                 </p>
 
-                <div class="hero-cta-group">
-                    <a href="/Universe_Setup_v2.0.0.exe" class="btn-primary-glow" id="downloadBtn">
+                <div class="hero-cta-group reveal-init">
+                    <a href="/Universe_Setup_v2.0.0.exe" class="btn-primary-glow shimmer-btn" id="downloadBtn">
                         <span class="btn-icon">⬇</span>
                         <span class="btn-text">
                             <strong>Download Universe v2.0.0</strong>
@@ -82,8 +85,8 @@
                     </a>
                 </div>
 
-                <p style="margin-top: -18px; margin-bottom: 28px; font-size: 0.82rem; color: var(--text-muted);">
-                    Prefer no installation? <a href="/Universe_v2.0.0_Portable.zip" style="color: var(--neon-cyan); text-decoration: underline;">Download Portable (.zip)</a>
+                <p class="portable-link-text">
+                    Prefer no installation? <a href="/Universe_v2.0.0_Portable.zip">Download Portable (.zip)</a>
                 </p>
 
                 <div class="specs-ribbon">
@@ -95,15 +98,37 @@
             </div>
         </section>
 
-        <!-- Interactive Live Playground Demo -->
-        <section id="interactive-demo" class="demo-section">
+        <!-- Stats Counter Section -->
+        <section id="stats" class="stats-section reveal-on-scroll">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number" data-target="0">0%</span>
+                    <span class="stat-label">Idle CPU Overhead</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" data-target="144">144+</span>
+                    <span class="stat-label">Fluid Display FPS</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" data-target="2.5">2.5 MB</span>
+                    <span class="stat-label">Ultra-Lightweight Size</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" data-target="0">0.01s</span>
+                    <span class="stat-label">Instant App Launch</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Live Playground Demo with 3D Perspective Tilt -->
+        <section id="interactive-demo" class="demo-section reveal-on-scroll">
             <div class="section-header">
                 <span class="section-tag">INTERACTIVE SIMULATOR</span>
                 <h2>Try the Cyber-Glass Fence Experience</h2>
-                <p>Click, search, or toggle cards inside this live in-browser preview.</p>
+                <p>Move mouse to tilt in 3D, click items, or filter in real time.</p>
             </div>
 
-            <div class="playground-wrapper">
+            <div class="playground-wrapper spotlight-container" id="tiltContainer">
                 <div class="cyber-fence-card" id="mockFence">
                     <div class="fence-header">
                         <div class="fence-title-group">
@@ -162,8 +187,8 @@
             </div>
         </section>
 
-        <!-- Features Showcase Grid -->
-        <section id="features" class="features-section">
+        <!-- Features Showcase Grid with Interactive Cursor Spotlights -->
+        <section id="features" class="features-section reveal-on-scroll">
             <div class="section-header">
                 <span class="section-tag">ENGINE ARCHITECTURE</span>
                 <h2>Engineered for Power, Built for Beauty</h2>
@@ -172,42 +197,42 @@
 
             <div class="features-grid">
                 <!-- Feature 1 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-cyan">🫧</div>
                     <h3>Floating Glass Bubbles</h3>
                     <p>Every file and app is housed in an anti-aliased floating capsule with specular highlights, hover elevation, and luminous selection glow.</p>
                 </div>
 
                 <!-- Feature 2 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-violet">⚡</div>
                     <h3>Instant Search (Ctrl + F)</h3>
                     <p>Filter through hundreds of desktop items in milliseconds. Type directly inside any fence to find and launch applications instantly.</p>
                 </div>
 
                 <!-- Feature 3 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-pink">🪄</div>
                     <h3>Magic Color Analyzer</h3>
                     <p>Automatically analyzes the dominant file types in each fence (code, media, documents) and tunes the accent color dynamically.</p>
                 </div>
 
                 <!-- Feature 4 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-cyan">🫁</div>
                     <h3>Breathing Pulse Physics</h3>
                     <p>A reactive pulse animation greets you whenever you drag-and-drop new files onto your fences, providing seamless kinetic feedback.</p>
                 </div>
 
                 <!-- Feature 5 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-violet">🔄</div>
                     <h3>Global Undo & Redo</h3>
                     <p>Accidentally removed or added an item? Press <kbd>Ctrl + Z</kbd> to effortlessly undo any fence modification in real time.</p>
                 </div>
 
                 <!-- Feature 6 -->
-                <div class="glass-card">
+                <div class="glass-card spotlight-card">
                     <div class="card-icon-pill icon-pink">🔋</div>
                     <h3>Battery Saver Mode</h3>
                     <p>Designed with hardware-accelerated GDI+ caching. Consumes 0% idle CPU and disables GPU blur effects automatically on battery power.</p>
@@ -216,14 +241,14 @@
         </section>
 
         <!-- Comparison Banner -->
-        <section class="comparison-section">
-            <div class="comparison-card">
+        <section class="comparison-section reveal-on-scroll">
+            <div class="comparison-card spotlight-card">
                 <div class="comparison-text">
                     <h3>The Modern Alternative to Commercial Organizers</h3>
                     <p>Lightweight, privacy-focused, zero telemetries, and 100% free forever.</p>
                 </div>
                 <div class="comparison-cta">
-                    <a href="/Universe_Setup_v2.0.0.exe" class="btn-primary-glow">
+                    <a href="/Universe_Setup_v2.0.0.exe" class="btn-primary-glow shimmer-btn">
                         Download Installer (.exe)
                     </a>
                 </div>
@@ -250,6 +275,7 @@
                 <div class="link-group">
                     <h4>Download</h4>
                     <a href="/Universe_Setup_v2.0.0.exe">Windows Installer (.exe)</a>
+                    <a href="/Universe_v2.0.0_Portable.zip">Portable Package (.zip)</a>
                     <a href="https://github.com/Notbazz12/Universe/archive/refs/heads/main.zip">Source Code (.zip)</a>
                 </div>
             </div>

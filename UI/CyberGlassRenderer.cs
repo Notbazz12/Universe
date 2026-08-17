@@ -146,6 +146,13 @@ namespace NoFences.UI
             }
         }
 
+        private static readonly SolidBrush _brushBubbleDefault = new SolidBrush(BubbleDefaultFill);
+        private static readonly SolidBrush _brushBubbleHover   = new SolidBrush(BubbleHoverFill);
+        private static readonly SolidBrush _brushBubbleSelect  = new SolidBrush(BubbleSelectFill);
+        private static readonly SolidBrush _brushGlassDarkBg   = new SolidBrush(GlassDarkBg);
+        private static readonly Pen _penNormalBorder           = new Pen(Color.FromArgb(28, 255, 255, 255), 1.0f);
+        private static readonly Pen _penSelectBorder           = new Pen(IridescentCyan, 1.4f);
+
         /// <summary>
         /// Renders a modern floating glass capsule (bubble) for a single file/folder entry.
         /// </summary>
@@ -157,23 +164,12 @@ namespace NoFences.UI
             {
                 if (isSelected)
                 {
-                    // Selected state: vibrant cyan glass glow
-                    using (var fillBrush = new SolidBrush(BubbleSelectFill))
-                    {
-                        g.FillPath(fillBrush, path);
-                    }
-                    using (var pen = new Pen(IridescentCyan, 1.4f))
-                    {
-                        g.DrawPath(pen, path);
-                    }
+                    g.FillPath(_brushBubbleSelect, path);
+                    g.DrawPath(_penSelectBorder, path);
                 }
                 else if (isHovered)
                 {
-                    // Hover state: floating iridescent bubble with lift
-                    using (var fillBrush = new SolidBrush(BubbleHoverFill))
-                    {
-                        g.FillPath(fillBrush, path);
-                    }
+                    g.FillPath(_brushBubbleHover, path);
                     using (var iriBrush = CreateIridescentBrush(rect, 45f))
                     using (var pen = new Pen(iriBrush, 1.2f))
                     {
@@ -182,15 +178,8 @@ namespace NoFences.UI
                 }
                 else
                 {
-                    // Normal state: minimal clean frosted capsule
-                    using (var fillBrush = new SolidBrush(BubbleDefaultFill))
-                    {
-                        g.FillPath(fillBrush, path);
-                    }
-                    using (var pen = new Pen(Color.FromArgb(28, 255, 255, 255), 1.0f))
-                    {
-                        g.DrawPath(pen, path);
-                    }
+                    g.FillPath(_brushBubbleDefault, path);
+                    g.DrawPath(_penNormalBorder, path);
                 }
             }
         }

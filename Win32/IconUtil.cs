@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -9,8 +9,12 @@ namespace NoFences.Win32
     public static class IconUtil
     {
         private static Icon folderIcon;
+        private static Icon fileIcon;
 
         public static Icon FolderLarge => folderIcon ?? (folderIcon = GetStockIcon(SHSIID_FOLDER, SHGSI_LARGEICON));
+        public static Icon FileLarge => fileIcon ?? (fileIcon = GetStockIcon(SHSIID_DOCNOASSOC, SHGSI_LARGEICON));
+
+        private const uint SHSIID_DOCNOASSOC = 0x0;
 
         private static Icon GetStockIcon(uint type, uint size)
         {
