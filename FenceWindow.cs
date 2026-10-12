@@ -459,11 +459,38 @@ namespace NoFences
             bool added = false;
             foreach (var file in dropped)
             {
-                    if (!fenceInfo.Files.Contains(file) && ItemExists(file))
+                if (Directory.Exists(file))
+                {
+                    var gameDetector = Core.DependencyInjection.GetRequiredService<Services.IGameDetectionService>();
+                    if (gameDetector != null && gameDetector.IsGameDirectory(file, out var gamesInFolder) && gamesInFolder.Count > 0)
                     {
-                        fenceInfo.Files.Add(file);
-                        cachedMagicColor = null; // Invalidate cache
-                        added = true;
+                        foreach (var g in gamesInFolder)
+                        {
+                            if (!fenceInfo.Files.Contains(g) && ItemExists(g))
+                            {
+                                fenceInfo.Files.Add(g);
+                                cachedMagicColor = null;
+                                added = true;
+                                if (historyService != null)
+                                {
+                                    historyService.RecordAction(new FenceAction
+                                    {
+                                        FenceId = fenceInfo.Id.ToString(),
+                                        Type = FenceAction.ActionType.FileAdded,
+                                        FilePath = g
+                                    });
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                if (!fenceInfo.Files.Contains(file) && ItemExists(file))
+                {
+                    fenceInfo.Files.Add(file);
+                    cachedMagicColor = null; // Invalidate cache
+                    added = true;
 
                     // History
                     if (historyService != null)

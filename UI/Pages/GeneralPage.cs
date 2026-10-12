@@ -138,6 +138,21 @@ namespace NoFences.UI.Pages
             };
             fenceCard.Controls.Add(btnDel);
 
+            var btnGames = CreateCyberButton("🎮  Organize Games", SettingsWindow.AccentVio, new Point(300, cy), 160);
+            btnGames.Click += (s, e) =>
+            {
+                var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopGames();
+                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    Info(count > 0 
+                        ? $"Successfully organized {count} games into your Games Fence!" 
+                        : "No new desktop games detected.");
+                }
+            };
+            fenceCard.Controls.Add(btnGames);
+
             // ── Application Maintenance Card ─────────────────────────────────────
             var appCard = CreateGlassCard("MAINTENANCE & UPDATES", ref y, 140);
             cy = 42;

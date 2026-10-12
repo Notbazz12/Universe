@@ -58,6 +58,46 @@ namespace NoFences.Model
                 catch { }
             }
 
+            // Extract high-res icon from .url (Steam / Epic) or .lnk shortcuts
+            if (Path.EndsWith(".url", StringComparison.OrdinalIgnoreCase))
+            {
+                var shortcut = ShellLinkHelper.Resolve(Path);
+                if (shortcut != null && !string.IsNullOrEmpty(shortcut.IconPath) && File.Exists(shortcut.IconPath))
+                {
+                    try
+                    {
+                        _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
+                        if (_cachedIcon != null) return _cachedIcon;
+                    }
+                    catch { }
+                }
+            }
+            else if (Path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+            {
+                var shortcut = ShellLinkHelper.Resolve(Path);
+                if (shortcut != null)
+                {
+                    if (!string.IsNullOrEmpty(shortcut.IconPath) && File.Exists(shortcut.IconPath))
+                    {
+                        try
+                        {
+                            _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
+                            if (_cachedIcon != null) return _cachedIcon;
+                        }
+                        catch { }
+                    }
+                    if (!string.IsNullOrEmpty(shortcut.TargetPath) && File.Exists(shortcut.TargetPath))
+                    {
+                        try
+                        {
+                            _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.TargetPath);
+                            if (_cachedIcon != null) return _cachedIcon;
+                        }
+                        catch { }
+                    }
+                }
+            }
+
             try
             {
                 if (File.Exists(Path))

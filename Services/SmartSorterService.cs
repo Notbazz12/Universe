@@ -13,21 +13,27 @@ namespace NoFences.Services
         void Start();
         void Stop();
         void Learn(string filePath, string fenceName);
+        int SortDesktopGames();
     }
 
     public class SmartSorterService : ISmartSorterService
     {
         private readonly IFenceService _fenceService;
         private readonly ILoggingService _loggingService;
+        private readonly IGameDetectionService _gameDetectionService;
         private FileSystemWatcher _watcher;
         private readonly string _desktopPath;
         private Dictionary<string, string> _rules; // Extension -> FenceName
         private readonly object _rulesLock = new object();
 
-        public SmartSorterService(IFenceService fenceService, ILoggingService loggingService)
+        public SmartSorterService(
+            IFenceService fenceService,
+            ILoggingService loggingService,
+            IGameDetectionService gameDetectionService)
         {
             _fenceService = fenceService ?? throw new ArgumentNullException(nameof(fenceService));
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            _gameDetectionService = gameDetectionService ?? throw new ArgumentNullException(nameof(gameDetectionService));
             _desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             LoadRules();
         }
@@ -59,6 +65,7 @@ namespace NoFences.Services
                         { ".xlsx", "Documents" },
                         { ".exe", "Programs" },
                         { ".lnk", "Shortcuts" },
+                        { ".url", "Bookmarks" },
                         { ".zip", "Archives" },
                         { ".rar", "Archives" },
                         { ".7z", "Archives" }
@@ -145,10 +152,35 @@ namespace NoFences.Services
                 try
                 {
                     // Short delay to let the creating process finish writing/closing the handle
-                    await Task.Delay(500);
+                    await Task.Delay(600);
 
                     if (!File.Exists(fullPath) && !Directory.Exists(fullPath)) return;
 
+                    var fences = _fenceService.GetAllFences();
+
+                    // 1. GAME DETECTION CHECK: Is this file or shortcut a Game?
+                    if (_gameDetectionService.IsGame(fullPath, out var gameTitle))
+                    {
+                        _loggingService.LogInfo($"SmartSorter: Detected game '{gameTitle}' at {fileName}");
+                        AddGameToAppropriateFence(fullPath, fences);
+                        return;
+                    }
+
+                    // 2. DIRECTORY CHECK: Is this a folder with multiple games inside?
+                    if (Directory.Exists(fullPath))
+                    {
+                        if (_gameDetectionService.IsGameDirectory(fullPath, out var gamesInDir) && gamesInDir.Count > 0)
+                        {
+                            _loggingService.LogInfo($"SmartSorter: Detected folder with {gamesInDir.Count} games at {fileName}");
+                            foreach (var game in gamesInDir)
+                            {
+                                AddGameToAppropriateFence(game, fences);
+                            }
+                            return;
+                        }
+                    }
+
+                    // 3. REGULAR EXTENSION RULES
                     string extension = Path.GetExtension(fullPath);
                     string targetFenceName = null;
 
@@ -164,7 +196,6 @@ namespace NoFences.Services
                     {
                         _loggingService.LogInfo($"SmartSorter: Detected {fileName}, moving to {targetFenceName}");
                         
-                        var fences = _fenceService.GetAllFences();
                         var targetFence = fences.FirstOrDefault(f => f.Name.Equals(targetFenceName, StringComparison.OrdinalIgnoreCase));
                         
                         if (targetFence != null)
@@ -183,6 +214,32 @@ namespace NoFences.Services
                     _loggingService.LogError($"SmartSorter error: {ex.Message}");
                 }
             });
+        }
+
+        private void AddGameToAppropriateFence(string filePath, List<FenceInfo> fences)
+        {
+            var targetFence = _gameDetectionService.FindBestFenceForGames(fences);
+
+            // If no game fence exists, auto-create one!
+            if (targetFence == null)
+            {
+                _loggingService.LogInfo("SmartSorter: No existing game fence found. Creating '🎮 Games' fence...");
+                _fenceService.CreateFence("🎮 Games", 120, 180, 420, 340);
+                fences = _fenceService.GetAllFences();
+                targetFence = _gameDetectionService.FindBestFenceForGames(fences) ?? fences.LastOrDefault();
+            }
+
+            if (targetFence != null)
+            {
+                _fenceService.AddFileToFence(targetFence.Id, filePath);
+                _loggingService.LogInfo($"SmartSorter: Game added to fence '{targetFence.Name}' -> {Path.GetFileName(filePath)}");
+            }
+        }
+
+        public int SortDesktopGames()
+        {
+            _loggingService.LogInfo("SmartSorter: Triggered manual desktop games sort");
+            return _gameDetectionService.OrganizeDesktopGames(_fenceService);
         }
 
         public void Learn(string filePath, string fenceName)

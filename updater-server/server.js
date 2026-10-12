@@ -31,15 +31,15 @@ app.get('/version.json', (req, res) => {
         
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const host = req.get('host');
-        data.downloadUrl = `${protocol}://${host}/Universe_Setup_v2.0.0.exe`;
+        data.downloadUrl = `${protocol}://${host}/Universe_Setup_v2.0.3.exe`;
         
         res.json(data);
     } else {
         res.json({
-            version: "2.0.0",
-            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.0.exe`,
-            sha256: "da76428463b051d72da321495108ef3e59ff01cbb7b872a3e8dacc423e1f8444",
-            releaseNotes: "Universe v2.0.0: Cyber-Glass & Iridescent Bubble Edition"
+            version: "2.0.3",
+            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.3.exe`,
+            sha256: "c9ead14be9b52b94ff6fa64b55be2524693ea5db275d088207d59b28a925834d",
+            releaseNotes: "Universe v2.0.3: Intelligent game detection (Steam, Epic, Riot, Blizzard) and multi-game folder unpacking."
         });
     }
 });

@@ -1,6 +1,6 @@
 {
-  "version": "2.0.2",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.2.exe",
-  "sha256": "d64a524440ee6e9e6c5f0af4dc9223d931c1d219e272588b2f10184f635947c0",
-  "releaseNotes": "Universe v2.0.2: Fluid mouse-wheel scrolling, responsive layout, and zero-lag 144 FPS engine."
+  "version": "2.0.3",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.3.exe",
+  "sha256": "c9ead14be9b52b94ff6fa64b55be2524693ea5db275d088207d59b28a925834d",
+  "releaseNotes": "Universe v2.0.3: Intelligent game detection (Steam, Epic, Riot, Blizzard), multi-game folder unpacking, and 144 FPS Cyber-Glass engine."
 }

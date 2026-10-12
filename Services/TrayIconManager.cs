@@ -42,6 +42,22 @@ namespace NoFences.Services
             toggleItem.Click += (s, e) => ToggleFences(toggleItem);
             _contextMenu.Items.Add(toggleItem);
 
+            // Organize Games
+            var sortGamesItem = new ToolStripMenuItem("🎮 Organize Games into Fence");
+            sortGamesItem.Click += (s, e) =>
+            {
+                var sorter = Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopGames();
+                    string msg = count > 0 
+                        ? $"Organized {count} games into your Games Fence!" 
+                        : "No new desktop games detected.";
+                    _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+                }
+            };
+            _contextMenu.Items.Add(sortGamesItem);
+
             _contextMenu.Items.Add(new ToolStripSeparator());
 
             // Settings
