@@ -42,6 +42,7 @@ namespace NoFences
                 _hoverBrush?.Dispose();
                 _selectedBrush?.Dispose();
                 _outlinePen?.Dispose();
+                mascotLoveTimer?.Dispose();
 
                 // Unsubscribe from events
                 if (thumbnailProvider != null)

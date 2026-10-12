@@ -17,6 +17,11 @@ namespace NoFences.Model
         public int AutoSaveInterval { get; set; } = 5; // seconds
         public bool EnableAnimations { get; set; } = true;
         public bool AutoCheckUpdates { get; set; } = true;
+        public bool ShowDesktopMascot { get; set; } = true;
+        public int DesktopMascotX { get; set; } = -1;
+        public int DesktopMascotY { get; set; } = -1;
+        public int DesktopMascotSize { get; set; } = 96;
+        public bool DesktopMascotTopMost { get; set; } = false;
         public string UpdateUrl { get; set; } = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
         public Dictionary<string, string> SmartSorterRules { get; set; } = null;
 

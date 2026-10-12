@@ -21,7 +21,7 @@ namespace NoFences.Services
     public class UpdateService : IUpdateService
     {
         private const string DefaultVersionUrl = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
-        public const string CurrentVersion = "2.0.6";
+        public const string CurrentVersion = "2.0.7";
         private readonly ILoggingService _loggingService;
 
         // Captured on construction (UI thread); used to marshal MessageBox calls

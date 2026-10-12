@@ -66,6 +66,8 @@ namespace NoFences.Model
 
                 foreach (var fence in fences)
                 {
+                    // Ensure mascot companion is enabled on all fences
+                    fence.ShowMascot = true;
                     _fenceCache[fence.Id] = fence;
                     try
                     {

@@ -47,6 +47,8 @@ namespace NoFences
         private bool isDragOverActive;
         private TextBox searchBox;
         private bool isSearchActive;
+        private bool isMascotLoveActive;
+        private System.Windows.Forms.Timer mascotLoveTimer;
         private readonly List<FenceEntry> filteredEntries = new List<FenceEntry>();
 
         private readonly ThrottledExecution throttledMove = new ThrottledExecution(TimeSpan.FromMilliseconds(500));
@@ -781,15 +783,16 @@ namespace NoFences
                     // Cosmic Mascot Companion
                     if (fenceInfo.ShowMascot)
                     {
-                        Image mascotImg = isDragOverActive ? Util.MascotProvider.Excited :
+                        Image mascotImg = isMascotLoveActive ? Util.MascotProvider.Love :
+                                          isDragOverActive ? Util.MascotProvider.Excited :
                                           hoveringItem != null ? Util.MascotProvider.Wink :
                                           isMinified ? Util.MascotProvider.Sleep :
                                           Util.MascotProvider.Happy;
 
                         if (mascotImg != null)
                         {
-                            int mascotSize = Math.Min(26, titleHeight - 6);
-                            int mascotX = (isCyberGlass && fenceInfo.ShowItemCountBadge) ? Width - 70 : Width - mascotSize - 10;
+                            int mascotSize = Math.Max(26, titleHeight - 4);
+                            int mascotX = (isCyberGlass && fenceInfo.ShowItemCountBadge) ? Width - 72 : Width - mascotSize - 12;
                             int mascotY = (titleHeight - mascotSize) / 2;
                             e.Graphics.DrawImage(mascotImg, new Rectangle(mascotX, mascotY, mascotSize, mascotSize));
                         }
@@ -1197,6 +1200,20 @@ namespace NoFences
 
         private void FenceWindow_MouseClick(object sender, MouseEventArgs e)
         {
+            // Mascot click reaction
+            if (e.Button == MouseButtons.Left && fenceInfo.ShowMascot && e.Y < titleHeight)
+            {
+                bool isCyberGlass = fenceInfo.Theme == "CyberGlass" || string.IsNullOrEmpty(fenceInfo.Theme);
+                int mascotSize = Math.Max(26, titleHeight - 4);
+                int mascotX = (isCyberGlass && fenceInfo.ShowItemCountBadge) ? Width - 72 : Width - mascotSize - 12;
+                var mascotRect = new Rectangle(mascotX, (titleHeight - mascotSize) / 2, mascotSize, mascotSize);
+                if (mascotRect.Contains(e.Location))
+                {
+                    TriggerMascotLove();
+                    return;
+                }
+            }
+
             // Middle-click to minify
             if (e.Button == MouseButtons.Middle && e.Y < titleHeight)
             {
@@ -1234,6 +1251,24 @@ namespace NoFences
             {
                 appContextMenu.Show(this, e.Location);
             }
+        }
+
+        private void TriggerMascotLove()
+        {
+            isMascotLoveActive = true;
+            Invalidate();
+            if (mascotLoveTimer == null)
+            {
+                mascotLoveTimer = new System.Windows.Forms.Timer { Interval = 1600 };
+                mascotLoveTimer.Tick += (s, e) =>
+                {
+                    mascotLoveTimer.Stop();
+                    isMascotLoveActive = false;
+                    Invalidate();
+                };
+            }
+            mascotLoveTimer.Stop();
+            mascotLoveTimer.Start();
         }
 
         private void FenceWindow_MouseWheel(object sender, MouseEventArgs e)

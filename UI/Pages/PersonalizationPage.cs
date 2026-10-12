@@ -132,14 +132,24 @@ namespace NoFences.UI.Pages
             themeCard.Controls.Add(themeCombo);
 
             // ── Cyber-Glass Effects ──────────────────────────────────────────────
-            var fxCard = CreateGlassCard("CYBER-GLASS & VISUAL EFFECTS", ref y, 185);
+            var fxCard = CreateGlassCard("CYBER-GLASS & VISUAL EFFECTS", ref y, 225);
             int cy = 42;
             CreateToggleRow(fxCard, "Iridescent Aura Border (luminous neon gradient glow)", ref cy, fenceInfo.EnableIridescentBorder,
                 on => { fenceInfo.EnableIridescentBorder = on; onChanged?.Invoke(); RefreshPreview(); });
             CreateToggleRow(fxCard, "Item Count Pill Badge  [ N items ]", ref cy, fenceInfo.ShowItemCountBadge,
                 on => { fenceInfo.ShowItemCountBadge = on; onChanged?.Invoke(); RefreshPreview(); });
-            CreateToggleRow(fxCard, "Cosmic Mascot Companion (shows reactive Universe mascot)", ref cy, fenceInfo.ShowMascot,
+            CreateToggleRow(fxCard, "Cosmic Mascot on Fences (reactive slime on title bar)", ref cy, fenceInfo.ShowMascot,
                 on => { fenceInfo.ShowMascot = on; onChanged?.Invoke(); RefreshPreview(); });
+            CreateToggleRow(fxCard, "Cosmic Desktop Pet (floating interactive companion)", ref cy, AppConfig.Load().ShowDesktopMascot,
+                on => {
+                    var cfg = AppConfig.Load();
+                    cfg.ShowDesktopMascot = on;
+                    cfg.Save();
+                    if (on && (DesktopMascotWindow.Instance == null || !DesktopMascotWindow.Instance.Visible))
+                        DesktopMascotWindow.ToggleVisibility();
+                    else if (!on && DesktopMascotWindow.Instance != null && DesktopMascotWindow.Instance.Visible)
+                        DesktopMascotWindow.ToggleVisibility();
+                });
             CreateToggleRow(fxCard, "Breathing Pulse Animation (on file drop/addition)", ref cy, fenceInfo.EnableBreathingEffect,
                 on => { fenceInfo.EnableBreathingEffect = on; onChanged?.Invoke(); });
 
@@ -225,6 +235,12 @@ namespace NoFences.UI.Pages
                 {
                     var countFont = new Font("Segoe UI", 7.5f, FontStyle.Bold);
                     CyberGlassRenderer.RenderPillBadge(g, new Rectangle(previewPanel.Width - 85, 14, 65, 20), $"{fenceInfo.Files.Count} items", countFont, CyberGlassRenderer.IridescentCyan);
+                }
+
+                if (fenceInfo.ShowMascot && MascotProvider.Happy != null)
+                {
+                    int mX = fenceInfo.ShowItemCountBadge ? previewPanel.Width - 118 : previewPanel.Width - 36;
+                    g.DrawImage(MascotProvider.Happy, new Rectangle(mX, 12, 24, 24));
                 }
 
                 // Sample Mini Floating Bubble

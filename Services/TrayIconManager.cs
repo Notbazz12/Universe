@@ -79,6 +79,16 @@ namespace NoFences.Services
             };
             _contextMenu.Items.Add(sortProgsItem);
 
+            // Desktop Mascot Companion
+            var mascotToggleItem = new ToolStripMenuItem("🐾 Cosmic Mascot Companion (Desktop Pet)");
+            mascotToggleItem.Click += (s, e) =>
+            {
+                DesktopMascotWindow.ToggleVisibility();
+                mascotToggleItem.Checked = DesktopMascotWindow.Instance != null && DesktopMascotWindow.Instance.Visible;
+            };
+            mascotToggleItem.Checked = AppConfig.Load().ShowDesktopMascot;
+            _contextMenu.Items.Add(mascotToggleItem);
+
             _contextMenu.Items.Add(new ToolStripSeparator());
 
             // Settings

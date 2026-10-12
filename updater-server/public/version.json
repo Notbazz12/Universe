@@ -1,6 +1,6 @@
 {
-  "version": "2.0.6",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.6.exe",
-  "sha256": "20e8754b84eb729ba765ee9275e4f3c4c9ab80731bee1e9f20957839ac22faff",
-  "releaseNotes": "Universe v2.0.6: Automatic background update checking, Windows desktop & toast notifications for new releases, and 1-click update installer."
+  "version": "2.0.7",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.7.exe",
+  "sha256": "fb822bccdbb2bc08eee3881dc200e3e4e95c9b0c745b47afc99c901ada5bfe22",
+  "releaseNotes": "Universe v2.0.7: Floating Cosmic Slime Desktop Pet, interactive mascot reactions on fences, and automatic companion enablement."
 }
