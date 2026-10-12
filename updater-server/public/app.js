@@ -252,23 +252,23 @@ async function fetchLiveVersion() {
     }
 }
 
-/* ── 7. Interactive Mascot Companion Expression Cycler ──────────────────── */
+/* ── 7. Interactive Mascot Companion Animation Cycler ─────────────────── */
 (function setupMascotCycler() {
     const mascot = document.getElementById('heroMascot');
     if (!mascot) return;
 
-    const moods = [
-        'mascot_happy.png',
-        'mascot_wink.png',
-        'mascot_excited.png',
-        'mascot_love.png',
-        'mascot_jump.png'
+    const anims = [
+        'animations/idle.gif',
+        'animations/react.gif',
+        'animations/jump.gif',
+        'animations/walk.gif',
+        'animations/sleep.gif'
     ];
-    let moodIndex = 0;
+    let animIndex = 0;
 
     mascot.addEventListener('click', () => {
-        moodIndex = (moodIndex + 1) % moods.length;
-        mascot.src = `mascot/${moods[moodIndex]}`;
+        animIndex = (animIndex + 1) % anims.length;
+        mascot.src = `mascot/${anims[animIndex]}`;
         mascot.style.transform = 'scale(1.28) rotate(-8deg)';
         setTimeout(() => {
             mascot.style.transform = '';

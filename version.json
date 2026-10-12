@@ -1,6 +1,6 @@
 {
-  "version": "2.0.7",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.7.exe",
-  "sha256": "fb822bccdbb2bc08eee3881dc200e3e4e95c9b0c745b47afc99c901ada5bfe22",
-  "releaseNotes": "Universe v2.0.7: Floating Cosmic Slime Desktop Pet, interactive mascot reactions on fences, and automatic companion enablement."
+  "version": "2.0.8",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.8.exe",
+  "sha256": "e71ba22425967ec2503df7c4f5273247f8c0661af6174696c0e523c6cd89662d",
+  "releaseNotes": "Universe v2.0.8: Full animated slime companion cycles (idle breathing, walking, high jump, heart reaction, sleep Zzz) for desktop pet and fences!"
 }

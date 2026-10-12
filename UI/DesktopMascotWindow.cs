@@ -15,25 +15,25 @@ namespace NoFences.UI
         private static DesktopMascotWindow _instance;
         public static DesktopMascotWindow Instance => _instance;
 
-        private MascotMood _currentMood = MascotMood.Happy;
-        private readonly Timer _floatTimer;
-        private readonly Timer _moodTimer;
+        public enum SlimeAnimationState
+        {
+            Idle,
+            Walk,
+            Jump,
+            React,
+            Sleep
+        }
+
+        private SlimeAnimationState _animState = SlimeAnimationState.Idle;
+        private int _currentFrame = 0;
+        private int _frameTicks = 0;
+        private readonly Timer _mainTimer;
         private float _floatAngle = 0f;
         private bool _isDragging = false;
         private Point _dragStartCursor;
         private Point _dragStartForm;
         private bool _hasDragged = false;
         private ContextMenuStrip _mascotMenu;
-
-        public enum MascotMood
-        {
-            Happy,
-            Wink,
-            Love,
-            Excited,
-            Jump,
-            Sleep
-        }
 
         #region Win32 P/Invoke for Per-Pixel Alpha Layered Window
 
@@ -111,12 +111,12 @@ namespace NoFences.UI
             StartPosition = FormStartPosition.Manual;
 
             var config = AppConfig.Load();
-            int size = config.DesktopMascotSize > 0 ? config.DesktopMascotSize : 96;
+            int size = config.DesktopMascotSize > 0 ? config.DesktopMascotSize : 100;
             Size = new Size(size, size);
 
             TopMost = config.DesktopMascotTopMost;
 
-            // Restore saved position or default near bottom-right above taskbar
+            // Restore saved position or default near bottom-right
             if (config.DesktopMascotX >= 0 && config.DesktopMascotY >= 0)
             {
                 Location = new Point(config.DesktopMascotX, config.DesktopMascotY);
@@ -124,38 +124,62 @@ namespace NoFences.UI
             else
             {
                 var screen = Screen.PrimaryScreen.WorkingArea;
-                Location = new Point(screen.Right - size - 40, screen.Bottom - size - 40);
+                Location = new Point(screen.Right - size - 45, screen.Bottom - size - 45);
             }
 
             InitContextMenu();
 
-            // Zero-gravity floating timer (30ms interval for fluid physics)
-            _floatTimer = new Timer { Interval = 35 };
-            _floatTimer.Tick += (s, e) =>
-            {
-                _floatAngle += 0.07f;
-                if (_floatAngle > 6.283f) _floatAngle -= 6.283f;
-                RenderMascot();
-            };
-
-            // Temporary mood timer (resets back to Happy after interactive reactions)
-            _moodTimer = new Timer { Interval = 2500 };
-            _moodTimer.Tick += (s, e) =>
-            {
-                _moodTimer.Stop();
-                if (_currentMood != MascotMood.Sleep)
-                {
-                    _currentMood = MascotMood.Happy;
-                    RenderMascot();
-                }
-            };
+            // Main loop timer (35ms for smooth 30fps animation & physics)
+            _mainTimer = new Timer { Interval = 35 };
+            _mainTimer.Tick += MainTimer_Tick;
 
             MouseDown += Mascot_MouseDown;
             MouseMove += Mascot_MouseMove;
             MouseUp += Mascot_MouseUp;
             MouseDoubleClick += Mascot_MouseDoubleClick;
 
-            _floatTimer.Start();
+            _mainTimer.Start();
+            RenderMascot();
+        }
+
+        private void MainTimer_Tick(object sender, EventArgs e)
+        {
+            _floatAngle += 0.07f;
+            if (_floatAngle > 6.283f) _floatAngle -= 6.283f;
+
+            _frameTicks++;
+
+            // Frame speed per animation state
+            int ticksPerFrame = 6; // default (~210ms)
+            switch (_animState)
+            {
+                case SlimeAnimationState.Walk:  ticksPerFrame = 4; break; // ~140ms
+                case SlimeAnimationState.Jump:  ticksPerFrame = 4; break; // ~140ms
+                case SlimeAnimationState.React: ticksPerFrame = 5; break; // ~175ms
+                case SlimeAnimationState.Sleep: ticksPerFrame = 8; break; // ~280ms
+                case SlimeAnimationState.Idle:  ticksPerFrame = 7; break; // ~245ms
+            }
+
+            if (_frameTicks >= ticksPerFrame)
+            {
+                _frameTicks = 0;
+                _currentFrame++;
+
+                if (_currentFrame >= 5)
+                {
+                    // Non-looping animations return to Idle
+                    if (_animState == SlimeAnimationState.Jump || _animState == SlimeAnimationState.React)
+                    {
+                        _animState = SlimeAnimationState.Idle;
+                        _currentFrame = 0;
+                    }
+                    else
+                    {
+                        _currentFrame = 0;
+                    }
+                }
+            }
+
             RenderMascot();
         }
 
@@ -170,15 +194,15 @@ namespace NoFences.UI
             _mascotMenu.Items.Add(new ToolStripSeparator());
 
             var petItem = new ToolStripMenuItem("💖 Pet Mascot (Give Love)");
-            petItem.Click += (s, e) => SetMood(MascotMood.Love, 3500);
+            petItem.Click += (s, e) => PlayAnimation(SlimeAnimationState.React);
             _mascotMenu.Items.Add(petItem);
 
-            var moodMenu = new ToolStripMenuItem("✨ Expressions");
-            moodMenu.DropDownItems.Add("😄 Happy", null, (s, e) => SetMood(MascotMood.Happy));
-            moodMenu.DropDownItems.Add("😉 Wink", null, (s, e) => SetMood(MascotMood.Wink, 3000));
-            moodMenu.DropDownItems.Add("🚀 Excited", null, (s, e) => SetMood(MascotMood.Excited, 3000));
-            moodMenu.DropDownItems.Add("🦘 Jump", null, (s, e) => SetMood(MascotMood.Jump, 3000));
-            moodMenu.DropDownItems.Add("💤 Sleep (Zzz)", null, (s, e) => SetMood(MascotMood.Sleep));
+            var moodMenu = new ToolStripMenuItem("✨ Animations & Poses");
+            moodMenu.DropDownItems.Add("💫 Idle Breathing", null, (s, e) => PlayAnimation(SlimeAnimationState.Idle));
+            moodMenu.DropDownItems.Add("🚶 Walk / Move", null, (s, e) => PlayAnimation(SlimeAnimationState.Walk));
+            moodMenu.DropDownItems.Add("🦘 High Jump", null, (s, e) => PlayAnimation(SlimeAnimationState.Jump));
+            moodMenu.DropDownItems.Add("💖 React / Love", null, (s, e) => PlayAnimation(SlimeAnimationState.React));
+            moodMenu.DropDownItems.Add("💤 Sleep (Zzz)", null, (s, e) => PlayAnimation(SlimeAnimationState.Sleep));
             _mascotMenu.Items.Add(moodMenu);
 
             _mascotMenu.Items.Add(new ToolStripSeparator());
@@ -207,29 +231,54 @@ namespace NoFences.UI
             ContextMenuStrip = _mascotMenu;
         }
 
-        public void SetMood(MascotMood mood, int durationMs = 0)
+        public void PlayAnimation(SlimeAnimationState state)
         {
-            _currentMood = mood;
+            _animState = state;
+            _currentFrame = 0;
+            _frameTicks = 0;
             RenderMascot();
-
-            _moodTimer.Stop();
-            if (durationMs > 0)
-            {
-                _moodTimer.Interval = durationMs;
-                _moodTimer.Start();
-            }
         }
 
-        private Image GetCurrentImage()
+        private Image GetCurrentFrameImage()
         {
-            switch (_currentMood)
+            int frame = Math.Max(0, Math.Min(4, _currentFrame));
+
+            switch (_animState)
             {
-                case MascotMood.Wink:    return MascotProvider.Wink ?? MascotProvider.Happy;
-                case MascotMood.Love:    return MascotProvider.Love ?? MascotProvider.Happy;
-                case MascotMood.Excited: return MascotProvider.Excited ?? MascotProvider.Happy;
-                case MascotMood.Jump:    return MascotProvider.Jump ?? MascotProvider.Happy;
-                case MascotMood.Sleep:   return MascotProvider.Sleep ?? MascotProvider.Happy;
-                default:                 return MascotProvider.Happy;
+                case SlimeAnimationState.Walk:
+                    var wf = MascotProvider.WalkFrames;
+                    if (wf != null && wf.Length > frame && wf[frame] != null) return wf[frame];
+                    break;
+
+                case SlimeAnimationState.Jump:
+                    var jf = MascotProvider.JumpFrames;
+                    if (jf != null && jf.Length > frame && jf[frame] != null) return jf[frame];
+                    break;
+
+                case SlimeAnimationState.React:
+                    var rf = MascotProvider.ReactFrames;
+                    if (rf != null && rf.Length > frame && rf[frame] != null) return rf[frame];
+                    break;
+
+                case SlimeAnimationState.Sleep:
+                    var sf = MascotProvider.SleepFrames;
+                    if (sf != null && sf.Length > frame && sf[frame] != null) return sf[frame];
+                    break;
+
+                case SlimeAnimationState.Idle:
+                default:
+                    var idf = MascotProvider.IdleFrames;
+                    if (idf != null && idf.Length > frame && idf[frame] != null) return idf[frame];
+                    break;
+            }
+
+            // Fallback to static sprites
+            switch (_animState)
+            {
+                case SlimeAnimationState.Sleep: return MascotProvider.Sleep;
+                case SlimeAnimationState.Jump:  return MascotProvider.Jump;
+                case SlimeAnimationState.React: return MascotProvider.Love ?? MascotProvider.Excited;
+                default:                        return MascotProvider.Happy;
             }
         }
 
@@ -237,11 +286,11 @@ namespace NoFences.UI
         {
             if (!IsHandleCreated || IsDisposed) return;
 
-            var sprite = GetCurrentImage();
+            var sprite = GetCurrentFrameImage();
             if (sprite == null) return;
 
             int size = Width;
-            int floatY = (int)(Math.Sin(_floatAngle) * 3);
+            int floatY = _animState == SlimeAnimationState.Sleep ? 0 : (int)(Math.Sin(_floatAngle) * 3);
 
             using (var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb))
             {
@@ -250,21 +299,21 @@ namespace NoFences.UI
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
 
-                    // Subtle celestial aura behind the slime
-                    int auraPad = 8;
+                    // Subtle celestial aura glow behind the slime
+                    int auraPad = 10;
                     var auraRect = new Rectangle(auraPad, auraPad + floatY, size - auraPad * 2, size - auraPad * 2);
                     using (var path = new GraphicsPath())
                     {
                         path.AddEllipse(auraRect);
                         using (var pgb = new PathGradientBrush(path))
                         {
-                            pgb.CenterColor = Color.FromArgb(40, 0, 220, 255);
+                            pgb.CenterColor = Color.FromArgb(45, 0, 220, 255);
                             pgb.SurroundColors = new[] { Color.FromArgb(0, 0, 0, 0) };
                             g.FillEllipse(pgb, auraRect);
                         }
                     }
 
-                    // Render Mascot Sprite
+                    // Render Mascot Sprite Frame
                     g.DrawImage(sprite, 4, 4 + floatY, size - 8, size - 8);
                 }
 
@@ -362,6 +411,13 @@ namespace NoFences.UI
                 {
                     _hasDragged = true;
                     Location = new Point(_dragStartForm.X + dx, _dragStartForm.Y + dy);
+
+                    // Switch to walk animation while dragging across screen
+                    if (_animState != SlimeAnimationState.Walk)
+                    {
+                        _animState = SlimeAnimationState.Walk;
+                        _currentFrame = 0;
+                    }
                 }
             }
         }
@@ -378,11 +434,25 @@ namespace NoFences.UI
                     cfg.DesktopMascotX = Location.X;
                     cfg.DesktopMascotY = Location.Y;
                     cfg.Save();
+
+                    // Return to Idle after finishing drag/walk
+                    PlayAnimation(SlimeAnimationState.Idle);
                 }
                 else
                 {
-                    // Click: Cycle expressions
-                    CycleMood();
+                    // Left-click interaction: trigger React or Jump
+                    if (_animState == SlimeAnimationState.Idle)
+                    {
+                        PlayAnimation(SlimeAnimationState.React);
+                    }
+                    else if (_animState == SlimeAnimationState.React)
+                    {
+                        PlayAnimation(SlimeAnimationState.Jump);
+                    }
+                    else
+                    {
+                        PlayAnimation(SlimeAnimationState.Idle);
+                    }
                 }
             }
         }
@@ -391,20 +461,7 @@ namespace NoFences.UI
         {
             if (e.Button == MouseButtons.Left)
             {
-                SetMood(MascotMood.Jump, 3000);
-            }
-        }
-
-        private void CycleMood()
-        {
-            switch (_currentMood)
-            {
-                case MascotMood.Happy:   SetMood(MascotMood.Wink, 2500); break;
-                case MascotMood.Wink:    SetMood(MascotMood.Love, 2500); break;
-                case MascotMood.Love:    SetMood(MascotMood.Excited, 2500); break;
-                case MascotMood.Excited: SetMood(MascotMood.Jump, 2500); break;
-                case MascotMood.Jump:    SetMood(MascotMood.Happy); break;
-                default:                 SetMood(MascotMood.Happy); break;
+                PlayAnimation(SlimeAnimationState.Jump);
             }
         }
 
@@ -438,10 +495,8 @@ namespace NoFences.UI
         {
             if (disposing)
             {
-                _floatTimer?.Stop();
-                _floatTimer?.Dispose();
-                _moodTimer?.Stop();
-                _moodTimer?.Dispose();
+                _mainTimer?.Stop();
+                _mainTimer?.Dispose();
                 _mascotMenu?.Dispose();
             }
             base.Dispose(disposing);

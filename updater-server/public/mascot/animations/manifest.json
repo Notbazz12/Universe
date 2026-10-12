@@ -1,0 +1,28 @@
+{
+  "source": "imagegen.png",
+  "format": "256x256 PNG RGBA frames; animated GIF and WebP",
+  "layout": "5 animations x 5 frames",
+  "animations": {
+    "idle": {
+      "frames": 5,
+      "duration_ms": 260
+    },
+    "walk": {
+      "frames": 5,
+      "duration_ms": 150
+    },
+    "sleep": {
+      "frames": 5,
+      "duration_ms": 350
+    },
+    "jump": {
+      "frames": 5,
+      "duration_ms": 135
+    },
+    "react": {
+      "frames": 5,
+      "duration_ms": 200
+    }
+  },
+  "note": "Frames are cropped from AI-generated poses; animations are pose cycles, not hand-drawn inbetweens."
+}
