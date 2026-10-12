@@ -32,6 +32,7 @@ namespace NoFences.Core
             services.AddSingleton<ITrayIconManager, TrayIconManager>();
             services.AddSingleton<IUpdateService, UpdateService>();
             services.AddSingleton<IGameDetectionService, GameDetectionService>();
+            services.AddSingleton<IProgramDetectionService, ProgramDetectionService>();
             services.AddSingleton<ISmartSorterService, SmartSorterService>();
             
             // Innovative Features

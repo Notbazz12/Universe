@@ -31,15 +31,15 @@ app.get('/version.json', (req, res) => {
         
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const host = req.get('host');
-        data.downloadUrl = `${protocol}://${host}/Universe_Setup_v2.0.3.exe`;
+        data.downloadUrl = `${protocol}://${host}/Universe_Setup_v2.0.4.exe`;
         
         res.json(data);
     } else {
         res.json({
-            version: "2.0.3",
-            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.3.exe`,
-            sha256: "c9ead14be9b52b94ff6fa64b55be2524693ea5db275d088207d59b28a925834d",
-            releaseNotes: "Universe v2.0.3: Intelligent game detection (Steam, Epic, Riot, Blizzard) and multi-game folder unpacking."
+            version: "2.0.4",
+            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.4.exe`,
+            sha256: "239f6144318045a1e2f20cdc56e1573d35e67e83942cef10f0d1f6ce880a7daa",
+            releaseNotes: "Universe v2.0.4: Smart Program & Application detection, multi-program folder unpacking, and 1-click desktop organization."
         });
     }
 });

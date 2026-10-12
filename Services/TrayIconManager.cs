@@ -58,6 +58,22 @@ namespace NoFences.Services
             };
             _contextMenu.Items.Add(sortGamesItem);
 
+            // Organize Programs
+            var sortProgsItem = new ToolStripMenuItem("⚡ Organize Programs into Fence");
+            sortProgsItem.Click += (s, e) =>
+            {
+                var sorter = Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopPrograms();
+                    string msg = count > 0 
+                        ? $"Organized {count} programs into your Programs Fence!" 
+                        : "No new desktop programs detected.";
+                    _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+                }
+            };
+            _contextMenu.Items.Add(sortProgsItem);
+
             _contextMenu.Items.Add(new ToolStripSeparator());
 
             // Settings

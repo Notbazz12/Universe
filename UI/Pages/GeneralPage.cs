@@ -106,7 +106,7 @@ namespace NoFences.UI.Pages
                 on => { config.ShowNotifications = on; config.Save(); });
 
             // ── Workspace Management Card ────────────────────────────────────────
-            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 140);
+            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 175);
             cy = 42;
 
             var svc = NoFences.Core.DependencyInjection.GetRequiredService<IFenceService>();
@@ -120,7 +120,7 @@ namespace NoFences.UI.Pages
                 Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold)
             };
             fenceCard.Controls.Add(lblCount);
-            cy += 34;
+            cy += 32;
 
             var btnNew = CreateCyberButton("＋  New Fence", SettingsWindow.AccentNeon, new Point(20, cy), 130);
             btnNew.Click += (s, e) => { svc.CreateFence("New Fence"); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
@@ -138,7 +138,9 @@ namespace NoFences.UI.Pages
             };
             fenceCard.Controls.Add(btnDel);
 
-            var btnGames = CreateCyberButton("🎮  Organize Games", SettingsWindow.AccentVio, new Point(300, cy), 160);
+            cy += 42;
+
+            var btnGames = CreateCyberButton("🎮  Organize Games", SettingsWindow.AccentVio, new Point(20, cy), 160);
             btnGames.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
@@ -152,6 +154,34 @@ namespace NoFences.UI.Pages
                 }
             };
             fenceCard.Controls.Add(btnGames);
+
+            var btnProgs = CreateCyberButton("⚡  Organize Programs", SettingsWindow.AccentNeon, new Point(190, cy), 170);
+            btnProgs.Click += (s, e) =>
+            {
+                var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopPrograms();
+                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    Info(count > 0 
+                        ? $"Successfully organized {count} programs into your Programs Fence!" 
+                        : "No new desktop programs detected.");
+                }
+            };
+            fenceCard.Controls.Add(btnProgs);
+
+            var btnAll = CreateCyberButton("🪄  Organize All", Color.FromArgb(160, 140, 255), new Point(370, cy), 140);
+            btnAll.Click += (s, e) =>
+            {
+                var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    var (gCount, pCount) = sorter.SortAllDesktop();
+                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    Info($"Desktop Organized!\n• Games: {gCount}\n• Programs: {pCount}");
+                }
+            };
+            fenceCard.Controls.Add(btnAll);
 
             // ── Application Maintenance Card ─────────────────────────────────────
             var appCard = CreateGlassCard("MAINTENANCE & UPDATES", ref y, 140);

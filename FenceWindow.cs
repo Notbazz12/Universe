@@ -484,6 +484,30 @@ namespace NoFences
                         }
                         continue;
                     }
+
+                    var progDetector = Core.DependencyInjection.GetRequiredService<Services.IProgramDetectionService>();
+                    if (progDetector != null && progDetector.IsProgramDirectory(file, out var progsInFolder) && progsInFolder.Count > 0)
+                    {
+                        foreach (var p in progsInFolder)
+                        {
+                            if (!fenceInfo.Files.Contains(p) && ItemExists(p))
+                            {
+                                fenceInfo.Files.Add(p);
+                                cachedMagicColor = null;
+                                added = true;
+                                if (historyService != null)
+                                {
+                                    historyService.RecordAction(new FenceAction
+                                    {
+                                        FenceId = fenceInfo.Id.ToString(),
+                                        Type = FenceAction.ActionType.FileAdded,
+                                        FilePath = p
+                                    });
+                                }
+                            }
+                        }
+                        continue;
+                    }
                 }
 
                 if (!fenceInfo.Files.Contains(file) && ItemExists(file))
