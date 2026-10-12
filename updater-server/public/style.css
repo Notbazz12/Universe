@@ -145,6 +145,25 @@ body {
     transform: rotate(15deg) scale(1.12);
 }
 
+.mascot-hero-avatar {
+    margin: 0 auto 14px auto;
+    width: 96px;
+    height: 96px;
+    filter: drop-shadow(0 0 22px rgba(0, 245, 212, 0.45));
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+}
+
+.mascot-hero-avatar:hover {
+    transform: scale(1.18) rotate(6deg);
+    filter: drop-shadow(0 0 32px rgba(139, 92, 246, 0.7));
+}
+
+.mascot-hero-avatar:active {
+    transform: scale(0.9);
+}
+
 .badge-pill {
     font-size: 0.72rem;
     font-family: var(--font-body);

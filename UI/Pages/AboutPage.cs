@@ -92,6 +92,22 @@ namespace NoFences.UI.Pages
                 BackColor = Color.Transparent
             });
 
+            // Interactive Cosmic Mascot
+            var picMascot = new PictureBox
+            {
+                Image     = Util.MascotProvider.Happy,
+                SizeMode  = PictureBoxSizeMode.Zoom,
+                Size      = new Size(68, 68),
+                Location  = new Point(Math.Max(380, appCard.Width - 96), 24),
+                Anchor    = AnchorStyles.Top | AnchorStyles.Right,
+                BackColor = Color.Transparent,
+                Cursor    = Cursors.Hand
+            };
+            picMascot.MouseEnter += (s, e) => picMascot.Image = Util.MascotProvider.Wink;
+            picMascot.MouseLeave += (s, e) => picMascot.Image = Util.MascotProvider.Happy;
+            picMascot.Click      += (s, e) => picMascot.Image = Util.MascotProvider.Excited;
+            appCard.Controls.Add(picMascot);
+
             // ── Links & Updates Card ────────────────────────────────────────────
             var linkCard = CreateGlassCard("COMMUNITY & UPDATES", ref y, 140);
             cy = 42;

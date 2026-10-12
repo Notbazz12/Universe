@@ -67,6 +67,7 @@ namespace NoFences.Model
         public int CornerRadius { get; set; } = 12;
         public bool EnableIridescentBorder { get; set; } = true;
         public bool ShowItemCountBadge { get; set; } = true;
+        public bool ShowMascot { get; set; } = true;
         public bool EnableMagicColor { get; set; } = false;
         public bool EnableBreathingEffect { get; set; } = false;
         public FenceContext Context { get; set; } = FenceContext.Always;

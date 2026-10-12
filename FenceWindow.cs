@@ -777,6 +777,23 @@ namespace NoFences
                         int badgeY = (titleHeight - badgeH) / 2;
                         UI.CyberGlassRenderer.RenderPillBadge(e.Graphics, new Rectangle(badgeX, badgeY, badgeW, badgeH), badgeText, countBadgeFont, UI.CyberGlassRenderer.IridescentCyan);
                     }
+
+                    // Cosmic Mascot Companion
+                    if (fenceInfo.ShowMascot)
+                    {
+                        Image mascotImg = isDragOverActive ? Util.MascotProvider.Excited :
+                                          hoveringItem != null ? Util.MascotProvider.Wink :
+                                          isMinified ? Util.MascotProvider.Sleep :
+                                          Util.MascotProvider.Happy;
+
+                        if (mascotImg != null)
+                        {
+                            int mascotSize = Math.Min(26, titleHeight - 6);
+                            int mascotX = (isCyberGlass && fenceInfo.ShowItemCountBadge) ? Width - 70 : Width - mascotSize - 10;
+                            int mascotY = (titleHeight - mascotSize) / 2;
+                            e.Graphics.DrawImage(mascotImg, new Rectangle(mascotX, mascotY, mascotSize, mascotSize));
+                        }
+                    }
                 }
             }
 

@@ -132,12 +132,14 @@ namespace NoFences.UI.Pages
             themeCard.Controls.Add(themeCombo);
 
             // ── Cyber-Glass Effects ──────────────────────────────────────────────
-            var fxCard = CreateGlassCard("CYBER-GLASS & VISUAL EFFECTS", ref y, 150);
+            var fxCard = CreateGlassCard("CYBER-GLASS & VISUAL EFFECTS", ref y, 185);
             int cy = 42;
             CreateToggleRow(fxCard, "Iridescent Aura Border (luminous neon gradient glow)", ref cy, fenceInfo.EnableIridescentBorder,
                 on => { fenceInfo.EnableIridescentBorder = on; onChanged?.Invoke(); RefreshPreview(); });
             CreateToggleRow(fxCard, "Item Count Pill Badge  [ N items ]", ref cy, fenceInfo.ShowItemCountBadge,
                 on => { fenceInfo.ShowItemCountBadge = on; onChanged?.Invoke(); RefreshPreview(); });
+            CreateToggleRow(fxCard, "Cosmic Mascot Companion (shows reactive Universe mascot)", ref cy, fenceInfo.ShowMascot,
+                on => { fenceInfo.ShowMascot = on; onChanged?.Invoke(); RefreshPreview(); });
             CreateToggleRow(fxCard, "Breathing Pulse Animation (on file drop/addition)", ref cy, fenceInfo.EnableBreathingEffect,
                 on => { fenceInfo.EnableBreathingEffect = on; onChanged?.Invoke(); });
 
