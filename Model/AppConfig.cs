@@ -16,7 +16,7 @@ namespace NoFences.Model
         public bool ShowNotifications { get; set; } = true;
         public int AutoSaveInterval { get; set; } = 5; // seconds
         public bool EnableAnimations { get; set; } = true;
-        public bool AutoCheckUpdates { get; set; } = false;
+        public bool AutoCheckUpdates { get; set; } = true;
         public string UpdateUrl { get; set; } = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
         public Dictionary<string, string> SmartSorterRules { get; set; } = null;
 

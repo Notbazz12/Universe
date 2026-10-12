@@ -1,6 +1,6 @@
 {
-  "version": "2.0.5",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.5.exe",
-  "sha256": "927c2a59d19364e1503a7a1d25580852e9eac6514d3312627ea8b9356ee4b7b7",
-  "releaseNotes": "Universe v2.0.5: Cosmic Mascot Companion (reactive on fences, about & website) + Game & Program Smart Sorting."
+  "version": "2.0.6",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.6.exe",
+  "sha256": "20e8754b84eb729ba765ee9275e4f3c4c9ab80731bee1e9f20957839ac22faff",
+  "releaseNotes": "Universe v2.0.6: Automatic background update checking, Windows desktop & toast notifications for new releases, and 1-click update installer."
 }

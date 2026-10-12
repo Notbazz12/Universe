@@ -10,14 +10,19 @@ namespace NoFences.Services
     {
         void Initialize();
         void Dispose();
+        void ShowNotification(string title, string message, ToolTipIcon icon = ToolTipIcon.Info, Action onClick = null);
+        void SetUpdateAvailable(string newVersion, Action onInstall);
     }
 
     public class TrayIconManager : ITrayIconManager, IDisposable
     {
         private readonly IFenceService _fenceService;
         private readonly ILoggingService _loggingService;
+        private readonly System.Threading.SynchronizationContext _uiContext = System.Threading.SynchronizationContext.Current;
         private NotifyIcon _notifyIcon;
         private ContextMenuStrip _contextMenu;
+        private Action _notificationClickAction;
+        private ToolStripMenuItem _updateMenuItem;
 
         public TrayIconManager(IFenceService fenceService, ILoggingService loggingService)
         {
@@ -97,6 +102,12 @@ namespace NoFences.Services
             };
 
             _notifyIcon.DoubleClick += (s, e) => OpenSettings();
+            _notifyIcon.BalloonTipClicked += (s, e) =>
+            {
+                var act = _notificationClickAction;
+                _notificationClickAction = null;
+                act?.Invoke();
+            };
         }
 
         private void CreateNewFence()
@@ -146,8 +157,69 @@ namespace NoFences.Services
             Environment.Exit(0);
         }
 
+        public void ShowNotification(string title, string message, ToolTipIcon icon = ToolTipIcon.Info, Action onClick = null)
+        {
+            if (_notifyIcon == null) return;
+            if (_uiContext != null && System.Threading.SynchronizationContext.Current != _uiContext)
+            {
+                _uiContext.Post(_ => ShowNotificationInternal(title, message, icon, onClick), null);
+            }
+            else
+            {
+                ShowNotificationInternal(title, message, icon, onClick);
+            }
+        }
+
+        private void ShowNotificationInternal(string title, string message, ToolTipIcon icon, Action onClick)
+        {
+            if (_notifyIcon == null) return;
+            _notificationClickAction = onClick;
+            _notifyIcon.ShowBalloonTip(6000, title, message, icon);
+        }
+
+        public void SetUpdateAvailable(string newVersion, Action onInstall)
+        {
+            if (_uiContext != null && System.Threading.SynchronizationContext.Current != _uiContext)
+            {
+                _uiContext.Post(_ => SetUpdateAvailableInternal(newVersion, onInstall), null);
+            }
+            else
+            {
+                SetUpdateAvailableInternal(newVersion, onInstall);
+            }
+        }
+
+        private void SetUpdateAvailableInternal(string newVersion, Action onInstall)
+        {
+            if (_contextMenu == null) return;
+            var config = AppConfig.Load();
+            bool isSpanish = config.Language == "Spanish";
+            string text = isSpanish 
+                ? $"⭐ Nueva versión v{newVersion} disponible (Instalar)" 
+                : $"⭐ Update v{newVersion} Available (Install)";
+
+            if (_updateMenuItem == null)
+            {
+                _updateMenuItem = new ToolStripMenuItem(text)
+                {
+                    Font = new Font(_contextMenu.Font, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(0, 220, 255)
+                };
+                _updateMenuItem.Click += (s, e) => onInstall?.Invoke();
+                _contextMenu.Items.Insert(0, _updateMenuItem);
+                _contextMenu.Items.Insert(1, new ToolStripSeparator());
+            }
+            else
+            {
+                _updateMenuItem.Text = text;
+                _updateMenuItem.Visible = true;
+            }
+        }
+
         public void Dispose()
         {
+            _updateMenuItem?.Dispose();
+            _updateMenuItem = null;
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;

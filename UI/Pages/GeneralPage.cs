@@ -91,7 +91,14 @@ namespace NoFences.UI.Pages
             cy += 48;
 
             CreateToggleRow(sysCard, "Start Universe with Windows", IsStartupEnabled(), ref cy, on => SetStartup(on));
-            CreateToggleRow(sysCard, "Check for updates automatically on startup", config.AutoCheckUpdates, ref cy, on => { config.AutoCheckUpdates = on; config.Save(); });
+            CreateToggleRow(sysCard, "Check for updates automatically on startup", config.AutoCheckUpdates, ref cy, on => 
+            { 
+                config.AutoCheckUpdates = on; 
+                config.Save(); 
+                var updateSvc = NoFences.Core.DependencyInjection.GetService<IUpdateService>();
+                if (on) updateSvc?.StartBackgroundCheck();
+                else updateSvc?.StopBackgroundCheck();
+            });
             CreateToggleRow(sysCard, "Laptop Mode (disables blur to maximize battery)", config.LaptopMode, ref cy,
                 on => { config.LaptopMode = on; config.Save(); Info("Restart to apply Laptop Mode."); });
             CreateToggleRow(sysCard, "Smooth Hardware Animations", config.EnableAnimations, ref cy,

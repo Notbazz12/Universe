@@ -14,15 +14,18 @@ namespace NoFences.UI
         private readonly ITrayIconManager _trayIconManager;
         private readonly ILoggingService _loggingService;
         private readonly ISmartSorterService _smartSorterService;
+        private readonly IUpdateService _updateService;
 
         public UniverseApplicationContext(
             ITrayIconManager trayIconManager,
             ILoggingService loggingService,
-            ISmartSorterService smartSorterService)
+            ISmartSorterService smartSorterService,
+            IUpdateService updateService)
         {
             _trayIconManager = trayIconManager ?? throw new ArgumentNullException(nameof(trayIconManager));
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
             _smartSorterService = smartSorterService ?? throw new ArgumentNullException(nameof(smartSorterService));
+            _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
 
             // Initialize Tray Icon
             _trayIconManager.Initialize();
@@ -33,6 +36,9 @@ namespace NoFences.UI
                 _smartSorterService.Start();
             }
 
+            // Start background update checker
+            _updateService.StartBackgroundCheck();
+
             _loggingService.LogInfo("Universe ApplicationContext initialized and active");
         }
 
@@ -41,6 +47,7 @@ namespace NoFences.UI
             if (disposing)
             {
                 _loggingService.LogInfo("Universe ApplicationContext disposing...");
+                _updateService?.StopBackgroundCheck();
                 _smartSorterService.Stop();
                 _trayIconManager.Dispose();
             }

@@ -174,7 +174,8 @@ namespace NoFences
 
                     // Run the application with UniverseApplicationContext
                     var smartSorterService = DependencyInjection.GetRequiredService<ISmartSorterService>();
-                    Application.Run(new NoFences.UI.UniverseApplicationContext(trayIconManager, loggingService, smartSorterService));
+                    var updateService = DependencyInjection.GetRequiredService<IUpdateService>();
+                    Application.Run(new NoFences.UI.UniverseApplicationContext(trayIconManager, loggingService, smartSorterService, updateService));
                 }
                 catch (Exception ex)
                 {
