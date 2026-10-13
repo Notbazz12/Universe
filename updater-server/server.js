@@ -29,17 +29,19 @@ app.get('/version.json', (req, res) => {
         const rawData = fs.readFileSync(versionFilePath, 'utf8');
         const data = JSON.parse(rawData);
         
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-        const host = req.get('host');
-        data.downloadUrl = `${protocol}://${host}/Universe_Setup_v2.0.4.exe`;
+        if (!data.downloadUrl) {
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+            const host = req.get('host');
+            data.downloadUrl = `${protocol}://${host}/Universe_Setup_v${data.version}.exe`;
+        }
         
         res.json(data);
     } else {
         res.json({
-            version: "2.0.4",
-            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.4.exe`,
-            sha256: "239f6144318045a1e2f20cdc56e1573d35e67e83942cef10f0d1f6ce880a7daa",
-            releaseNotes: "Universe v2.0.4: Smart Program & Application detection, multi-program folder unpacking, and 1-click desktop organization."
+            version: "2.0.9",
+            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.9.exe`,
+            sha256: "59bda70e6528863197017a898f2833ace8ea8354020058c1e8e26124f306a1da",
+            releaseNotes: "Universe v2.0.9: Specialized Images & Tasks fences with auto-import and file filtering, plus compact icon sizes (16px, 20px, 24px) with smooth Ctrl + Mouse Wheel zoom!"
         });
     }
 });
