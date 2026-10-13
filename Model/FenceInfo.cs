@@ -50,7 +50,8 @@ namespace NoFences.Model
         public float TitleFontSize { get; set; } = 12f;
         public string ItemFontName { get; set; } = "Segoe UI";
         public float ItemFontSize { get; set; } = 9f;
-        public int IconSize { get; set; } = 32; // 32, 48, 64
+        public int IconSize { get; set; } = 32; // 16, 20, 24, 32, 40, 48, 64
+        public string FilterType { get; set; } = "All"; // "All", "Images", "Tasks"
 
         public FenceInfo()
         {

@@ -40,6 +40,10 @@ namespace NoFences.Services
             
             // Tray Icon & Application Exit
             { "NewFence", new Dictionary<Language, string> { { Language.English, "New Fence" }, { Language.Spanish, "Nuevo Fence" } } },
+            { "NewFenceImages", new Dictionary<Language, string> { { Language.English, "New Fence: Images" }, { Language.Spanish, "Nuevo Fence: Imágenes" } } },
+            { "NewFenceTasks", new Dictionary<Language, string> { { Language.English, "New Fence: Tasks & Notes" }, { Language.Spanish, "Nuevo Fence: Tareas y Notas" } } },
+            { "OrganizeImages", new Dictionary<Language, string> { { Language.English, "Organize Images into Fence" }, { Language.Spanish, "Organizar Imágenes en Fence" } } },
+            { "OrganizeTasks", new Dictionary<Language, string> { { Language.English, "Organize Tasks & Notes into Fence" }, { Language.Spanish, "Organizar Tareas en Fence" } } },
             { "ShowFences", new Dictionary<Language, string> { { Language.English, "Show Fences" }, { Language.Spanish, "Mostrar Fences" } } },
             { "HideFences", new Dictionary<Language, string> { { Language.English, "Hide Fences" }, { Language.Spanish, "Ocultar Fences" } } },
             { "Exit", new Dictionary<Language, string> { { Language.English, "Exit" }, { Language.Spanish, "Salir" } } },

@@ -201,12 +201,18 @@ namespace NoFences.UI.Pages
                 Location = new Point(390, cy),
                 Width    = 160
             };
-            iconCombo.Items.AddRange(new object[] { "32 px (Normal)", "48 px (Large)", "64 px (Extra)" });
-            iconCombo.SelectedIndex = fenceInfo.IconSize == 64 ? 2 : fenceInfo.IconSize == 48 ? 1 : 0;
+            var supportedSizes = new[] { 16, 20, 24, 32, 48, 64 };
+            iconCombo.Items.AddRange(new object[] { "16 px (Extra Small)", "20 px (Compact)", "24 px (Small)", "32 px (Normal)", "48 px (Large)", "64 px (Extra)" });
+            int selectedIndex = Array.IndexOf(supportedSizes, fenceInfo.IconSize);
+            if (selectedIndex < 0) selectedIndex = 3; // default 32
+            iconCombo.SelectedIndex = selectedIndex;
             iconCombo.SelectedIndexChanged += (s, e) =>
             {
-                fenceInfo.IconSize = iconCombo.SelectedIndex == 2 ? 64 : iconCombo.SelectedIndex == 1 ? 48 : 32;
-                onChanged?.Invoke();
+                if (iconCombo.SelectedIndex >= 0 && iconCombo.SelectedIndex < supportedSizes.Length)
+                {
+                    fenceInfo.IconSize = supportedSizes[iconCombo.SelectedIndex];
+                    onChanged?.Invoke();
+                }
             };
             fontCard.Controls.Add(iconCombo);
 

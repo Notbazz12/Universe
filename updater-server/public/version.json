@@ -1,6 +1,6 @@
 {
-  "version": "2.0.8",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.8.exe",
-  "sha256": "e71ba22425967ec2503df7c4f5273247f8c0661af6174696c0e523c6cd89662d",
-  "releaseNotes": "Universe v2.0.8: Full animated slime companion cycles (idle breathing, walking, high jump, heart reaction, sleep Zzz) for desktop pet and fences!"
+  "version": "2.0.9",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.9.exe",
+  "sha256": "59bda70e6528863197017a898f2833ace8ea8354020058c1e8e26124f306a1da",
+  "releaseNotes": "Universe v2.0.9: Specialized Images & Tasks fences with auto-import and file filtering, plus compact icon sizes (16px, 20px, 24px) with smooth Ctrl + Mouse Wheel zoom!"
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using NoFences.Persistence;
@@ -14,6 +15,9 @@ namespace NoFences.Model
     {
         void LoadFences();
         void CreateFence(string name, int posX = 100, int posY = 250, int width = 300, int height = 300);
+        FenceInfo CreateImageFence();
+        FenceInfo CreateTaskFence();
+        FenceInfo CreateSpecializedFence(string name, string filterType, int posX, int posY, int width, int height, int iconSize, List<string> initialFiles = null);
         void UpdateFence(FenceInfo fenceInfo);
         void RemoveFence(FenceInfo fenceInfo);
         List<FenceInfo> GetAllFences();
@@ -112,6 +116,138 @@ namespace NoFences.Model
             _loggingService.LogInfo($"Created new fence: {name}");
         }
 
+        public FenceInfo CreateImageFence()
+        {
+            var desktopDirs = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+            };
+
+            var foundImages = new List<string>();
+            foreach (var dir in desktopDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir))
+                    {
+                        if (FenceFilterHelper.IsImageFile(file) && !foundImages.Contains(file))
+                        {
+                            foundImages.Add(file);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Fallback: If no images on desktop, import up to 8 sample images from MyPictures
+            if (foundImages.Count == 0)
+            {
+                string pics = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+                if (!string.IsNullOrEmpty(pics) && Directory.Exists(pics))
+                {
+                    try
+                    {
+                        foreach (var file in Directory.GetFiles(pics))
+                        {
+                            if (FenceFilterHelper.IsImageFile(file) && !foundImages.Contains(file))
+                            {
+                                foundImages.Add(file);
+                                if (foundImages.Count >= 8) break;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            return CreateSpecializedFence("🖼️ Images", "Images", 100, 200, 360, 320, 24, foundImages);
+        }
+
+        public FenceInfo CreateTaskFence()
+        {
+            var desktopDirs = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+            };
+
+            var foundTasks = new List<string>();
+            foreach (var dir in desktopDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir))
+                    {
+                        if (FenceFilterHelper.IsTaskFile(file) && !foundTasks.Contains(file))
+                        {
+                            foundTasks.Add(file);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // If no task files exist on Desktop, create starter task note
+            if (foundTasks.Count == 0)
+            {
+                try
+                {
+                    string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    if (!string.IsNullOrEmpty(desktop) && Directory.Exists(desktop))
+                    {
+                        string noteFile = Path.Combine(desktop, "📝 Mis Tareas.txt");
+                        if (!File.Exists(noteFile))
+                        {
+                            File.WriteAllText(noteFile,
+                                "=== 📝 MIS TAREAS / NOTAS ===\r\n" +
+                                "Universe v2.0.9\r\n\r\n" +
+                                "[ ] Tarea 1: Organizar archivos en Universe Fences\r\n" +
+                                "[ ] Tarea 2: Probar zoom con Ctrl + Rueda del ratón\r\n" +
+                                "[ ] Tarea 3: Personalizar temas y colores CyberGlass\r\n");
+                        }
+                        foundTasks.Add(noteFile);
+                    }
+                }
+                catch { }
+            }
+
+            return CreateSpecializedFence("📝 Tasks & Notes", "Tasks", 480, 200, 340, 320, 20, foundTasks);
+        }
+
+        public FenceInfo CreateSpecializedFence(string name, string filterType, int posX, int posY, int width, int height, int iconSize, List<string> initialFiles = null)
+        {
+            var fenceInfo = new FenceInfo(Guid.NewGuid())
+            {
+                Name = name,
+                FilterType = filterType ?? "All",
+                PosX = posX,
+                PosY = posY,
+                Width = width,
+                Height = height,
+                IconSize = iconSize > 0 ? iconSize : 24,
+                TitleHeight = 35,
+                CanMinify = true,
+                Locked = false,
+                ShowMascot = true,
+                Files = initialFiles != null ? new List<string>(initialFiles) : new List<string>()
+            };
+
+            UpdateFence(fenceInfo);
+
+            lock (_syncLock)
+            {
+                var window = new FenceWindow(fenceInfo);
+                window.Show();
+                _openFences.Add(window);
+            }
+
+            _loggingService.LogInfo($"Created specialized fence '{name}' (Filter={filterType}, IconSize={iconSize}) with {fenceInfo.Files.Count} items");
+            return fenceInfo;
+        }
+
         public void UpdateFence(FenceInfo fenceInfo)
         {
             if (fenceInfo == null)
@@ -190,6 +326,12 @@ namespace NoFences.Model
         {
             var fence = GetFence(fenceId);
             if (fence == null) return;
+
+            if (!FenceFilterHelper.MatchesFilter(filePath, fence.FilterType))
+            {
+                _loggingService.LogWarning($"Skipped adding '{filePath}' to fence '{fence.Name}' because it does not match filter '{fence.FilterType}'");
+                return;
+            }
 
             lock (_syncLock)
             {

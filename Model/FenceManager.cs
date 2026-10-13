@@ -40,6 +40,16 @@ namespace NoFences.Model
             _fenceService.CreateFence(name);
         }
 
+        public FenceInfo CreateImageFence()
+        {
+            return _fenceService.CreateImageFence();
+        }
+
+        public FenceInfo CreateTaskFence()
+        {
+            return _fenceService.CreateTaskFence();
+        }
+
         public void RemoveFence(FenceInfo info)
         {
             _fenceService.RemoveFence(info);

@@ -37,10 +37,36 @@ namespace NoFences.Services
             _contextMenu = new ContextMenuStrip();
             _contextMenu.Renderer = new FenceMenuRenderer();
             
-            // New Fence
-            var newFenceItem = new ToolStripMenuItem(LocalizationManager.GetString("NewFence"));
-            newFenceItem.Click += (s, e) => CreateNewFence();
-            _contextMenu.Items.Add(newFenceItem);
+            // New Fence Menu
+            var newFenceMenu = new ToolStripMenuItem(LocalizationManager.GetString("NewFence") ?? "New Fence");
+
+            var newGeneralItem = new ToolStripMenuItem("📄 General Fence");
+            newGeneralItem.Click += (s, e) => CreateNewFence();
+            newFenceMenu.DropDownItems.Add(newGeneralItem);
+
+            var newImageFenceItem = new ToolStripMenuItem("🖼️ New Fence: Images (Auto-Import)");
+            newImageFenceItem.Click += (s, e) =>
+            {
+                var info = _fenceService.CreateImageFence();
+                string msg = info != null && info.Files.Count > 0
+                    ? $"Created Images Fence with {info.Files.Count} pictures!"
+                    : "Created Images Fence ready for pictures!";
+                _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+            };
+            newFenceMenu.DropDownItems.Add(newImageFenceItem);
+
+            var newTaskFenceItem = new ToolStripMenuItem("📝 New Fence: Tasks & Notes (Auto-Import)");
+            newTaskFenceItem.Click += (s, e) =>
+            {
+                var info = _fenceService.CreateTaskFence();
+                string msg = info != null && info.Files.Count > 0
+                    ? $"Created Tasks Fence with {info.Files.Count} items!"
+                    : "Created Tasks Fence ready for notes!";
+                _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+            };
+            newFenceMenu.DropDownItems.Add(newTaskFenceItem);
+
+            _contextMenu.Items.Add(newFenceMenu);
 
             // Show/Hide Fences (Toggle)
             var toggleItem = new ToolStripMenuItem(LocalizationManager.GetString("HideFences"));
@@ -78,6 +104,38 @@ namespace NoFences.Services
                 }
             };
             _contextMenu.Items.Add(sortProgsItem);
+
+            // Organize Images
+            var sortImagesItem = new ToolStripMenuItem("🖼️ Organize Images into Fence");
+            sortImagesItem.Click += (s, e) =>
+            {
+                var sorter = Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopImages();
+                    string msg = count > 0 
+                        ? $"Organized {count} images into your Images Fence!" 
+                        : "No new desktop images detected.";
+                    _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+                }
+            };
+            _contextMenu.Items.Add(sortImagesItem);
+
+            // Organize Tasks
+            var sortTasksItem = new ToolStripMenuItem("📝 Organize Tasks & Notes into Fence");
+            sortTasksItem.Click += (s, e) =>
+            {
+                var sorter = Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopTasks();
+                    string msg = count > 0 
+                        ? $"Organized {count} tasks/notes into your Tasks Fence!" 
+                        : "No new desktop tasks detected.";
+                    _notifyIcon.ShowBalloonTip(3000, "Universe", msg, ToolTipIcon.Info);
+                }
+            };
+            _contextMenu.Items.Add(sortTasksItem);
 
             // Desktop Mascot Companion
             var mascotToggleItem = new ToolStripMenuItem("🐾 Cosmic Mascot Companion (Desktop Pet)");

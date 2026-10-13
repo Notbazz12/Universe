@@ -442,9 +442,30 @@ namespace NoFences
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop) && !fenceInfo.Locked)
             {
-                e.Effect = DragDropEffects.Move;
-                isDragOverActive = true;
-                Invalidate();
+                var dropped = (string[])e.Data.GetData(DataFormats.FileDrop);
+                bool hasAllowed = false;
+                if (dropped != null)
+                {
+                    foreach (var f in dropped)
+                    {
+                        if (Directory.Exists(f) || FenceFilterHelper.MatchesFilter(f, fenceInfo.FilterType))
+                        {
+                            hasAllowed = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasAllowed)
+                {
+                    e.Effect = DragDropEffects.Move;
+                    isDragOverActive = true;
+                    Invalidate();
+                }
+                else
+                {
+                    e.Effect = DragDropEffects.None;
+                }
             }
         }
 
@@ -468,7 +489,7 @@ namespace NoFences
                     {
                         foreach (var g in gamesInFolder)
                         {
-                            if (!fenceInfo.Files.Contains(g) && ItemExists(g))
+                            if (!fenceInfo.Files.Contains(g) && ItemExists(g) && FenceFilterHelper.MatchesFilter(g, fenceInfo.FilterType))
                             {
                                 fenceInfo.Files.Add(g);
                                 cachedMagicColor = null;
@@ -492,7 +513,7 @@ namespace NoFences
                     {
                         foreach (var p in progsInFolder)
                         {
-                            if (!fenceInfo.Files.Contains(p) && ItemExists(p))
+                            if (!fenceInfo.Files.Contains(p) && ItemExists(p) && FenceFilterHelper.MatchesFilter(p, fenceInfo.FilterType))
                             {
                                 fenceInfo.Files.Add(p);
                                 cachedMagicColor = null;
@@ -512,7 +533,7 @@ namespace NoFences
                     }
                 }
 
-                if (!fenceInfo.Files.Contains(file) && ItemExists(file))
+                if (!fenceInfo.Files.Contains(file) && ItemExists(file) && FenceFilterHelper.MatchesFilter(file, fenceInfo.FilterType))
                 {
                     fenceInfo.Files.Add(file);
                     cachedMagicColor = null; // Invalidate cache
@@ -571,6 +592,21 @@ namespace NoFences
             }
         }
 
+        private static readonly int[] AvailableIconSizes = new[] { 16, 20, 24, 32, 40, 48, 64 };
+
+        private int CalculateItemWidth(int iconSize)
+        {
+            if (iconSize <= 20) return iconSize + 28;
+            if (iconSize <= 32) return iconSize + 36;
+            return iconSize + 40;
+        }
+
+        private int CalculateItemHeight(int iconSize)
+        {
+            int fontH = iconFont != null ? (int)iconFont.Height : 14;
+            return iconSize + itemPadding + fontH + 8;
+        }
+
         /// <summary>
         /// Returns the file path of the entry under <paramref name="pt"/>,
         /// or null if the cursor is not over any item.
@@ -582,8 +618,8 @@ namespace NoFences
 
             int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
             int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
-            int currentItemWidth  = currentIconSize + 40;
-            int currentItemHeight = currentIconSize + itemPadding + (iconFont != null ? (int)iconFont.Height : 14) + 5;
+            int currentItemWidth  = CalculateItemWidth(currentIconSize);
+            int currentItemHeight = CalculateItemHeight(currentIconSize);
 
             int x = itemPadding;
             int y = itemPadding;
@@ -802,8 +838,8 @@ namespace NoFences
 
             // Items
             int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
-            int currentItemWidth = currentIconSize + 40;
-            int currentItemHeight = currentIconSize + itemPadding + (int)iconFont.Height + 5;
+            int currentItemWidth = CalculateItemWidth(currentIconSize);
+            int currentItemHeight = CalculateItemHeight(currentIconSize);
 
             var x = itemPadding;
             var y = itemPadding;
@@ -1021,13 +1057,20 @@ namespace NoFences
         private void UpdateFilteredEntries(string filter)
         {
             filteredEntries.Clear();
+
+            IEnumerable<FenceEntry> source = cachedEntries;
+            if (!string.IsNullOrEmpty(fenceInfo.FilterType) && !fenceInfo.FilterType.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                source = source.Where(entry => FenceFilterHelper.MatchesFilter(entry.Path, fenceInfo.FilterType));
+            }
+
             if (string.IsNullOrWhiteSpace(filter))
             {
-                filteredEntries.AddRange(cachedEntries);
+                filteredEntries.AddRange(source);
             }
             else
             {
-                foreach (var entry in cachedEntries)
+                foreach (var entry in source)
                 {
                     if (entry.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
@@ -1076,13 +1119,33 @@ namespace NoFences
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // New Fence
-            var newFenceItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("NewFence"));
-            newFenceItem.Click += (s, args) => 
+            var newFenceMenu = new ToolStripMenuItem(Services.LocalizationManager.GetString("NewFence") ?? "New Fence");
+
+            var newGeneralFence = new ToolStripMenuItem("📄 General Fence");
+            newGeneralFence.Click += (s, args) =>
             {
                 var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
-                fenceService.CreateFence("New Fence");
+                fenceService?.CreateFence("New Fence");
             };
-            appContextMenu.Items.Add(newFenceItem);
+            newFenceMenu.DropDownItems.Add(newGeneralFence);
+
+            var newImageFence = new ToolStripMenuItem("🖼️ New Fence: Images (Auto-Import)");
+            newImageFence.Click += (s, args) =>
+            {
+                var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
+                fenceService?.CreateImageFence();
+            };
+            newFenceMenu.DropDownItems.Add(newImageFence);
+
+            var newTaskFence = new ToolStripMenuItem("📝 New Fence: Tasks & Notes (Auto-Import)");
+            newTaskFence.Click += (s, args) =>
+            {
+                var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
+                fenceService?.CreateTaskFence();
+            };
+            newFenceMenu.DropDownItems.Add(newTaskFence);
+
+            appContextMenu.Items.Add(newFenceMenu);
 
             // Import Folder (NEW)
             var importFolderItem = new ToolStripMenuItem("Import Folder Content");
@@ -1091,8 +1154,25 @@ namespace NoFences
 
             appContextMenu.Items.Add(new ToolStripSeparator());
 
-            // View
-            var viewItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("View"));
+            // View / Icon Size
+            var viewItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("View") ?? "View");
+            var iconSizeSubMenu = new ToolStripMenuItem("Icon Size");
+            int[] sizes = { 16, 20, 24, 32, 40, 48, 64 };
+            string[] sizeLabels = { "16 px (Extra Small)", "20 px (Compact)", "24 px (Small)", "32 px (Normal)", "40 px (Medium)", "48 px (Large)", "64 px (Extra Large)" };
+            for (int i = 0; i < sizes.Length; i++)
+            {
+                int s = sizes[i];
+                var sizeOption = new ToolStripMenuItem(sizeLabels[i]);
+                sizeOption.Checked = (fenceInfo.IconSize == s);
+                sizeOption.Click += (s2, args2) =>
+                {
+                    fenceInfo.IconSize = s;
+                    Save();
+                    Invalidate();
+                };
+                iconSizeSubMenu.DropDownItems.Add(sizeOption);
+            }
+            viewItem.DropDownItems.Add(iconSizeSubMenu);
             appContextMenu.Items.Add(viewItem);
 
             // Sort
@@ -1273,6 +1353,42 @@ namespace NoFences
 
         private void FenceWindow_MouseWheel(object sender, MouseEventArgs e)
         {
+            if (ModifierKeys.HasFlag(Keys.Control))
+            {
+                int currentSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
+                int idx = -1;
+                for (int i = 0; i < AvailableIconSizes.Length; i++)
+                {
+                    if (AvailableIconSizes[i] == currentSize)
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx < 0)
+                {
+                    idx = 3; // default 32
+                    for (int i = 0; i < AvailableIconSizes.Length; i++)
+                    {
+                        if (AvailableIconSizes[i] >= currentSize) { idx = i; break; }
+                    }
+                }
+
+                if (e.Delta > 0 && idx < AvailableIconSizes.Length - 1)
+                {
+                    fenceInfo.IconSize = AvailableIconSizes[idx + 1];
+                    Save();
+                    Invalidate();
+                }
+                else if (e.Delta < 0 && idx > 0)
+                {
+                    fenceInfo.IconSize = AvailableIconSizes[idx - 1];
+                    Save();
+                    Invalidate();
+                }
+                return;
+            }
+
             if (scrollHeight < 1)
                 return;
 
@@ -1311,15 +1427,15 @@ namespace NoFences
         {
             int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
             int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
-            int currentItemWidth = currentIconSize + 40;
-            int currentItemHeight = currentIconSize + itemPadding + (int)iconFont.Height + 5;
+            int currentItemWidth = CalculateItemWidth(currentIconSize);
+            int currentItemHeight = CalculateItemHeight(currentIconSize);
 
             var x = itemPadding;
             var y = itemPadding;
 
             using (var g = CreateGraphics())
             {
-                foreach (var entry in cachedEntries)
+                foreach (var entry in filteredEntries)
                 {
                     var textMaxSize = new SizeF(currentItemWidth, iconFont.Height * 2);
                     var textSize = g.MeasureString(entry.Name, iconFont, textMaxSize, entryStringFormat);

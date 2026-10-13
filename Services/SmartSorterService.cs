@@ -15,6 +15,8 @@ namespace NoFences.Services
         void Learn(string filePath, string fenceName);
         int SortDesktopGames();
         int SortDesktopPrograms();
+        int SortDesktopImages();
+        int SortDesktopTasks();
         (int gamesCount, int programsCount) SortAllDesktop();
     }
 
@@ -200,6 +202,29 @@ namespace NoFences.Services
                         }
                     }
 
+                    // 3.5 SPECIALIZED FENCE CHECKS (Images & Tasks)
+                    if (FenceFilterHelper.IsImageFile(fullPath))
+                    {
+                        var imageFence = fences.FirstOrDefault(f => f.FilterType == "Images" || f.Name.IndexOf("Images", StringComparison.OrdinalIgnoreCase) >= 0 || f.Name.IndexOf("Imágenes", StringComparison.OrdinalIgnoreCase) >= 0);
+                        if (imageFence != null)
+                        {
+                            _fenceService.AddFileToFence(imageFence.Id, fullPath);
+                            _loggingService.LogInfo($"SmartSorter: Auto-routed new image '{fileName}' to '{imageFence.Name}'");
+                            return;
+                        }
+                    }
+
+                    if (FenceFilterHelper.IsTaskFile(fullPath))
+                    {
+                        var taskFence = fences.FirstOrDefault(f => f.FilterType == "Tasks" || f.Name.IndexOf("Tasks", StringComparison.OrdinalIgnoreCase) >= 0 || f.Name.IndexOf("Tareas", StringComparison.OrdinalIgnoreCase) >= 0);
+                        if (taskFence != null)
+                        {
+                            _fenceService.AddFileToFence(taskFence.Id, fullPath);
+                            _loggingService.LogInfo($"SmartSorter: Auto-routed new task '{fileName}' to '{taskFence.Name}'");
+                            return;
+                        }
+                    }
+
                     // 4. REGULAR EXTENSION RULES
                     string extension = Path.GetExtension(fullPath);
                     string targetFenceName = null;
@@ -284,6 +309,80 @@ namespace NoFences.Services
         {
             _loggingService.LogInfo("SmartSorter: Triggered manual desktop programs sort");
             return _programDetectionService.OrganizeDesktopPrograms(_fenceService);
+        }
+
+        public int SortDesktopImages()
+        {
+            _loggingService.LogInfo("SmartSorter: Triggered manual desktop images sort");
+            var fences = _fenceService.GetAllFences();
+            var targetFence = fences.FirstOrDefault(f => f.FilterType == "Images" || f.Name.IndexOf("Images", StringComparison.OrdinalIgnoreCase) >= 0 || f.Name.IndexOf("Imágenes", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (targetFence == null)
+            {
+                var newFence = _fenceService.CreateImageFence();
+                return newFence?.Files?.Count ?? 0;
+            }
+
+            int count = 0;
+            string[] desktopDirs = {
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+            };
+
+            foreach (var dir in desktopDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir))
+                    {
+                        if (FenceFilterHelper.IsImageFile(file) && !targetFence.Files.Contains(file))
+                        {
+                            _fenceService.AddFileToFence(targetFence.Id, file);
+                            count++;
+                        }
+                    }
+                }
+                catch { }
+            }
+            return count;
+        }
+
+        public int SortDesktopTasks()
+        {
+            _loggingService.LogInfo("SmartSorter: Triggered manual desktop tasks sort");
+            var fences = _fenceService.GetAllFences();
+            var targetFence = fences.FirstOrDefault(f => f.FilterType == "Tasks" || f.Name.IndexOf("Tasks", StringComparison.OrdinalIgnoreCase) >= 0 || f.Name.IndexOf("Tareas", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (targetFence == null)
+            {
+                var newFence = _fenceService.CreateTaskFence();
+                return newFence?.Files?.Count ?? 0;
+            }
+
+            int count = 0;
+            string[] desktopDirs = {
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+            };
+
+            foreach (var dir in desktopDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir))
+                    {
+                        if (FenceFilterHelper.IsTaskFile(file) && !targetFence.Files.Contains(file))
+                        {
+                            _fenceService.AddFileToFence(targetFence.Id, file);
+                            count++;
+                        }
+                    }
+                }
+                catch { }
+            }
+            return count;
         }
 
         public (int gamesCount, int programsCount) SortAllDesktop()

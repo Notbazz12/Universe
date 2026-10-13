@@ -113,7 +113,7 @@ namespace NoFences.UI.Pages
                 on => { config.ShowNotifications = on; config.Save(); });
 
             // ── Workspace Management Card ────────────────────────────────────────
-            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 175);
+            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 220);
             cy = 42;
 
             var svc = NoFences.Core.DependencyInjection.GetRequiredService<IFenceService>();
@@ -129,11 +129,19 @@ namespace NoFences.UI.Pages
             fenceCard.Controls.Add(lblCount);
             cy += 32;
 
-            var btnNew = CreateCyberButton("＋  New Fence", SettingsWindow.AccentNeon, new Point(20, cy), 130);
+            var btnNew = CreateCyberButton("＋  New Fence", SettingsWindow.AccentNeon, new Point(20, cy), 120);
             btnNew.Click += (s, e) => { svc.CreateFence("New Fence"); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
             fenceCard.Controls.Add(btnNew);
 
-            var btnDel = CreateCyberButton("🗑  Delete All", SettingsWindow.AccentPink, new Point(160, cy), 130);
+            var btnNewImg = CreateCyberButton("🖼  Images Fence", SettingsWindow.AccentVio, new Point(150, cy), 130);
+            btnNewImg.Click += (s, e) => { svc.CreateImageFence(); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            fenceCard.Controls.Add(btnNewImg);
+
+            var btnNewTask = CreateCyberButton("📝  Tasks Fence", Color.FromArgb(70, 200, 255), new Point(290, cy), 130);
+            btnNewTask.Click += (s, e) => { svc.CreateTaskFence(); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            fenceCard.Controls.Add(btnNewTask);
+
+            var btnDel = CreateCyberButton("🗑  Delete All", SettingsWindow.AccentPink, new Point(430, cy), 120);
             btnDel.Click += (s, e) =>
             {
                 var all = svc.GetAllFences();
@@ -189,6 +197,38 @@ namespace NoFences.UI.Pages
                 }
             };
             fenceCard.Controls.Add(btnAll);
+
+            cy += 42;
+
+            var btnImgs = CreateCyberButton("🖼  Organize Images", SettingsWindow.AccentVio, new Point(20, cy), 160);
+            btnImgs.Click += (s, e) =>
+            {
+                var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopImages();
+                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    Info(count > 0 
+                        ? $"Successfully organized {count} images into your Images Fence!" 
+                        : "No new desktop images detected.");
+                }
+            };
+            fenceCard.Controls.Add(btnImgs);
+
+            var btnTasks = CreateCyberButton("📝  Organize Tasks", Color.FromArgb(70, 200, 255), new Point(190, cy), 170);
+            btnTasks.Click += (s, e) =>
+            {
+                var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
+                if (sorter != null)
+                {
+                    int count = sorter.SortDesktopTasks();
+                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    Info(count > 0 
+                        ? $"Successfully organized {count} tasks/notes into your Tasks Fence!" 
+                        : "No new desktop tasks detected.");
+                }
+            };
+            fenceCard.Controls.Add(btnTasks);
 
             // ── Application Maintenance Card ─────────────────────────────────────
             var appCard = CreateGlassCard("MAINTENANCE & UPDATES", ref y, 140);
