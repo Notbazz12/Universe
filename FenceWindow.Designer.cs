@@ -24,8 +24,11 @@ namespace NoFences
                 titleFont?.Dispose();
                 iconFont?.Dispose();
                 appContextMenu?.Dispose();
-                throttledMove?.Dispose();
-                throttledResize?.Dispose();
+                debounceMove?.Dispose();
+                debounceResize?.Dispose();
+                countBadgeFont?.Dispose();
+                _glassCache?.Dispose();
+                searchFont?.Dispose();
                 breathingEffect?.Dispose();
                 shellContextMenu?.ReleaseAll();
 
@@ -45,10 +48,7 @@ namespace NoFences
                 mascotLoveTimer?.Dispose();
 
                 // Unsubscribe from events
-                if (thumbnailProvider != null)
-                {
-                    thumbnailProvider.IconThumbnailLoaded -= ThumbnailProvider_IconThumbnailLoaded;
-                }
+                NoFences.Util.IconCache.Shared.Loaded -= IconCache_Loaded;
             }
             base.Dispose(disposing);
         }

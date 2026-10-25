@@ -78,71 +78,94 @@ namespace NoFences.UI
         }
 
         /// <summary>
+        /// Geometry and gradient brushes of a glass container, rebuilt only when its size or
+        /// corner radius changes (they used to be recreated on every repaint).
+        /// </summary>
+        public sealed class ContainerCache : IDisposable
+        {
+            internal GraphicsPath Path;
+            internal LinearGradientBrush Iridescent;
+            internal LinearGradientBrush Specular;
+            internal Pen SpecularPen;
+            private Rectangle _rect;
+            private int _radius = -1;
+
+            internal void Ensure(Rectangle rect, int radius)
+            {
+                if (Path != null && _rect == rect && _radius == radius) return;
+                Dispose();
+
+                _rect = rect;
+                _radius = radius;
+                Path = CreateRoundedRectanglePath(rect, radius);
+                Iridescent = CreateIridescentBrush(rect, 35f);
+                Specular = new LinearGradientBrush(
+                    new Point(rect.X, rect.Y),
+                    new Point(rect.Right, rect.Y),
+                    SpecularTopLight,
+                    Color.FromArgb(10, 255, 255, 255));
+                SpecularPen = new Pen(Specular, 1.2f);
+            }
+
+            public void Dispose()
+            {
+                SpecularPen?.Dispose();
+                Specular?.Dispose();
+                Iridescent?.Dispose();
+                Path?.Dispose();
+                SpecularPen = null; Specular = null; Iridescent = null; Path = null;
+            }
+        }
+
+        private static readonly Pen _penDragAura   = new Pen(Color.FromArgb(140, IridescentCyan), 3.5f);
+        private static readonly Pen _penHoverAura  = new Pen(Color.FromArgb(70, IridescentViolet), 2.5f);
+        private static readonly Pen _penRestBorder = new Pen(Color.FromArgb(120, IridescentViolet), 1.0f);
+
+        /// <summary>One-off render without a cache (previews).</summary>
+        public static void RenderCyberGlassContainer(Graphics g, Rectangle bounds, bool isHovered, bool isDragActive, int radius = 10)
+        {
+            using (var cache = new ContainerCache())
+                RenderCyberGlassContainer(g, bounds, isHovered, isDragActive, radius, cache);
+        }
+
+        /// <summary>
         /// Renders the complete Cyber-Glass body, specular highlight, and iridescent border.
         /// </summary>
-        public static void RenderCyberGlassContainer(Graphics g, Rectangle bounds, bool isHovered, bool isDragActive, int radius = 10)
+        public static void RenderCyberGlassContainer(Graphics g, Rectangle bounds, bool isHovered, bool isDragActive, int radius, ContainerCache cache)
         {
             if (bounds.Width <= 4 || bounds.Height <= 4) return;
 
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
             var containerRect = new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
+            cache.Ensure(containerRect, radius);
+            var path = cache.Path;
 
-            using (var path = CreateRoundedRectanglePath(containerRect, radius))
+            // 1. Frosted Glass Fill
+            g.FillPath(_brushGlassDarkBg, path);
+
+            // 2. Top Specular Reflection (Tempered Glass Edge)
+            g.DrawLine(cache.SpecularPen, containerRect.X + radius, containerRect.Y + 1, containerRect.Right - radius, containerRect.Y + 1);
+
+            // 3. Iridescent Outer Glow & Border
+            if (isDragActive)
             {
-                // 1. Frosted Glass Fill
-                using (var bgBrush = new SolidBrush(GlassDarkBg))
-                {
-                    g.FillPath(bgBrush, path);
-                }
-
-                // 2. Top Specular Reflection (Tempered Glass Edge)
-                using (var specBrush = new LinearGradientBrush(
-                    new Point(containerRect.X, containerRect.Y),
-                    new Point(containerRect.Right, containerRect.Y),
-                    SpecularTopLight,
-                    Color.FromArgb(10, 255, 255, 255)))
-                using (var specPen = new Pen(specBrush, 1.2f))
-                {
-                    g.DrawLine(specPen, containerRect.X + radius, containerRect.Y + 1, containerRect.Right - radius, containerRect.Y + 1);
-                }
-
-                // 3. Iridescent Outer Glow & Border
-                using (var iriBrush = CreateIridescentBrush(containerRect, 35f))
-                {
-                    if (isDragActive)
-                    {
-                        // Pulsing Magnetic Drag Aura
-                        using (var auraPen = new Pen(Color.FromArgb(140, IridescentCyan), 3.5f))
-                        {
-                            g.DrawPath(auraPen, path);
-                        }
-                        using (var borderPen = new Pen(iriBrush, 1.8f))
-                        {
-                            g.DrawPath(borderPen, path);
-                        }
-                    }
-                    else if (isHovered)
-                    {
-                        // Hover Active Glow
-                        using (var auraPen = new Pen(Color.FromArgb(70, IridescentViolet), 2.5f))
-                        {
-                            g.DrawPath(auraPen, path);
-                        }
-                        using (var borderPen = new Pen(iriBrush, 1.5f))
-                        {
-                            g.DrawPath(borderPen, path);
-                        }
-                    }
-                    else
-                    {
-                        // Subtle Resting Iridescent Edge
-                        using (var borderPen = new Pen(Color.FromArgb(120, IridescentViolet), 1.0f))
-                        {
-                            g.DrawPath(borderPen, path);
-                        }
-                    }
-                }
+                // Pulsing Magnetic Drag Aura
+                g.DrawPath(_penDragAura, path);
+                using (var borderPen = new Pen(cache.Iridescent, 1.8f))
+                    g.DrawPath(borderPen, path);
+            }
+            else if (isHovered)
+            {
+                // Hover Active Glow
+                g.DrawPath(_penHoverAura, path);
+                using (var borderPen = new Pen(cache.Iridescent, 1.5f))
+                    g.DrawPath(borderPen, path);
+            }
+            else
+            {
+                // Subtle Resting Iridescent Edge
+                g.DrawPath(_penRestBorder, path);
             }
         }
 

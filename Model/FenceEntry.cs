@@ -10,15 +10,19 @@ namespace NoFences.Model
 {
     public class FenceEntry
     {
+        private static readonly ThumbnailProvider Thumbnails = new ThumbnailProvider();
+
         public string Path { get; }
 
         public EntryType Type { get; }
 
-        public string Name => Type == EntryType.Folder 
-            ? System.IO.Path.GetFileName(Path) 
+        public string Name => Type == EntryType.Folder
+            ? System.IO.Path.GetFileName(Path)
             : System.IO.Path.GetFileNameWithoutExtension(Path);
 
-        private Icon _cachedIcon;
+        /// <summary>Measured name height, cached by the window (depends on item width and font).</summary>
+        internal int TextHeight = -1;
+        internal int TextHeightKey;
 
         private FenceEntry(string path, EntryType type)
         {
@@ -37,23 +41,28 @@ namespace NoFences.Model
             else return null;
         }
 
-        public Icon ExtractIcon(ThumbnailProvider thumbnailProvider)
+        /// <summary>
+        /// Returns the icon if it is already loaded, otherwise a placeholder; the real icon is
+        /// loaded on a background thread and IconCache.Loaded fires when it is ready.
+        /// Never blocks the caller.
+        /// </summary>
+        public Icon ExtractIcon()
         {
-            if (_cachedIcon != null)
-                return _cachedIcon;
-
             if (Type == EntryType.Folder)
-            {
-                _cachedIcon = IconUtil.FolderLarge;
-                return _cachedIcon;
-            }
+                return IconUtil.FolderLarge;
 
-            if (thumbnailProvider != null && thumbnailProvider.IsSupported(Path))
+            return IconCache.Shared.GetOrQueue(Path, LoadIconCore, IconUtil.FileLarge);
+        }
+
+        /// <summary>Runs on the IconCache loader thread.</summary>
+        private Icon LoadIconCore()
+        {
+            if (Thumbnails.IsSupported(Path))
             {
                 try
                 {
-                    _cachedIcon = thumbnailProvider.GenerateThumbnail(Path);
-                    if (_cachedIcon != null) return _cachedIcon;
+                    var thumb = Thumbnails.LoadThumbnail(Path);
+                    if (thumb != null) return thumb;
                 }
                 catch { }
             }
@@ -66,8 +75,8 @@ namespace NoFences.Model
                 {
                     try
                     {
-                        _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
-                        if (_cachedIcon != null) return _cachedIcon;
+                        var icon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
+                        if (icon != null) return icon;
                     }
                     catch { }
                 }
@@ -81,8 +90,8 @@ namespace NoFences.Model
                     {
                         try
                         {
-                            _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
-                            if (_cachedIcon != null) return _cachedIcon;
+                            var icon = Icon.ExtractAssociatedIcon(shortcut.IconPath);
+                            if (icon != null) return icon;
                         }
                         catch { }
                     }
@@ -90,8 +99,8 @@ namespace NoFences.Model
                     {
                         try
                         {
-                            _cachedIcon = Icon.ExtractAssociatedIcon(shortcut.TargetPath);
-                            if (_cachedIcon != null) return _cachedIcon;
+                            var icon = Icon.ExtractAssociatedIcon(shortcut.TargetPath);
+                            if (icon != null) return icon;
                         }
                         catch { }
                     }
@@ -101,19 +110,16 @@ namespace NoFences.Model
             try
             {
                 if (File.Exists(Path))
-                    _cachedIcon = Icon.ExtractAssociatedIcon(Path);
+                    return Icon.ExtractAssociatedIcon(Path);
             }
-            catch
-            {
-                _cachedIcon = IconUtil.FileLarge;
-            }
+            catch { }
 
-            return _cachedIcon ?? IconUtil.FileLarge;
+            return IconUtil.FileLarge;
         }
 
         public void InvalidateIcon()
         {
-            _cachedIcon = null;
+            IconCache.Shared.Invalidate(Path);
         }
 
         public void Open()

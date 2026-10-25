@@ -35,6 +35,11 @@ namespace NoFences.UI
         private bool _hasDragged = false;
         private ContextMenuStrip _mascotMenu;
 
+        // Rendered (and alpha-premultiplied) frames, keyed by state/frame/float offset.
+        // Rendering is the expensive part, so each distinct frame is drawn only once.
+        private readonly System.Collections.Generic.Dictionary<int, Bitmap> _frameCache = new System.Collections.Generic.Dictionary<int, Bitmap>();
+        private int _lastKey = -1;
+
         #region Win32 P/Invoke for Per-Pixel Alpha Layered Window
 
         [StructLayout(LayoutKind.Sequential)]
@@ -138,12 +143,32 @@ namespace NoFences.UI
             MouseUp += Mascot_MouseUp;
             MouseDoubleClick += Mascot_MouseDoubleClick;
 
-            _mainTimer.Start();
-            RenderMascot();
+            // The timer only runs while the window is visible (see OnVisibleChanged)
+        }
+
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (_mainTimer == null) return;
+
+            if (Visible)
+            {
+                _lastKey = -1;
+                _mainTimer.Start();
+                RenderMascot();
+            }
+            else
+            {
+                _mainTimer.Stop();
+            }
         }
 
         private void MainTimer_Tick(object sender, EventArgs e)
         {
+            // Sleeping needs far fewer wake-ups (no floating, slow frames)
+            int wantedInterval = _animState == SlimeAnimationState.Sleep ? 70 : 35;
+            if (_mainTimer.Interval != wantedInterval) _mainTimer.Interval = wantedInterval;
+
             _floatAngle += 0.07f;
             if (_floatAngle > 6.283f) _floatAngle -= 6.283f;
 
@@ -156,7 +181,7 @@ namespace NoFences.UI
                 case SlimeAnimationState.Walk:  ticksPerFrame = 4; break; // ~140ms
                 case SlimeAnimationState.Jump:  ticksPerFrame = 4; break; // ~140ms
                 case SlimeAnimationState.React: ticksPerFrame = 5; break; // ~175ms
-                case SlimeAnimationState.Sleep: ticksPerFrame = 8; break; // ~280ms
+                case SlimeAnimationState.Sleep: ticksPerFrame = 4; break; // ~280ms (70ms ticks)
                 case SlimeAnimationState.Idle:  ticksPerFrame = 7; break; // ~245ms
             }
 
@@ -236,6 +261,7 @@ namespace NoFences.UI
             _animState = state;
             _currentFrame = 0;
             _frameTicks = 0;
+            if (_mainTimer != null && Visible && !_mainTimer.Enabled) _mainTimer.Start();
             RenderMascot();
         }
 
@@ -284,68 +310,84 @@ namespace NoFences.UI
 
         private void RenderMascot()
         {
-            if (!IsHandleCreated || IsDisposed) return;
+            if (!IsHandleCreated || IsDisposed || !Visible) return;
 
-            var sprite = GetCurrentFrameImage();
-            if (sprite == null) return;
+            int floatY = _animState == SlimeAnimationState.Sleep ? 0 : (int)Math.Round(Math.Sin(_floatAngle) * 3);
+            int frame = Math.Max(0, Math.Min(4, _currentFrame));
+            int key = ((int)_animState << 16) | (frame << 8) | (floatY + 3);
 
-            int size = Width;
-            int floatY = _animState == SlimeAnimationState.Sleep ? 0 : (int)(Math.Sin(_floatAngle) * 3);
+            // Nothing visible changed since the last frame: skip all drawing work
+            if (key == _lastKey) return;
 
-            using (var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb))
+            if (!_frameCache.TryGetValue(key, out var bmp))
             {
-                using (var g = Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                var sprite = GetCurrentFrameImage();
+                if (sprite == null) return;
 
-                    // Subtle celestial aura glow behind the slime
-                    int auraPad = 10;
-                    var auraRect = new Rectangle(auraPad, auraPad + floatY, size - auraPad * 2, size - auraPad * 2);
-                    using (var path = new GraphicsPath())
-                    {
-                        path.AddEllipse(auraRect);
-                        using (var pgb = new PathGradientBrush(path))
-                        {
-                            pgb.CenterColor = Color.FromArgb(45, 0, 220, 255);
-                            pgb.SurroundColors = new[] { Color.FromArgb(0, 0, 0, 0) };
-                            g.FillEllipse(pgb, auraRect);
-                        }
-                    }
-
-                    // Render Mascot Sprite Frame
-                    g.DrawImage(sprite, 4, 4 + floatY, size - 8, size - 8);
-                }
-
-                // Pre-multiply alpha for UpdateLayeredWindow
-                unsafe
-                {
-                    var data = bmp.LockBits(new Rectangle(0, 0, size, size), ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-                    byte* scan0 = (byte*)data.Scan0.ToPointer();
-                    int total = data.Stride * size;
-                    for (int i = 0; i < total; i += 4)
-                    {
-                        byte b = scan0[i];
-                        byte gVal = scan0[i + 1];
-                        byte r = scan0[i + 2];
-                        byte a = scan0[i + 3];
-
-                        if (a == 0)
-                        {
-                            scan0[i] = scan0[i + 1] = scan0[i + 2] = 0;
-                        }
-                        else if (a < 255)
-                        {
-                            scan0[i]     = (byte)((b * a) / 255);
-                            scan0[i + 1] = (byte)((gVal * a) / 255);
-                            scan0[i + 2] = (byte)((r * a) / 255);
-                        }
-                    }
-                    bmp.UnlockBits(data);
-                }
-
-                SetLayeredBitmap(bmp);
+                bmp = RenderFrame(sprite, floatY);
+                _frameCache[key] = bmp;
             }
+
+            _lastKey = key;
+            SetLayeredBitmap(bmp); // the cache owns the bitmap: do not dispose it here
+        }
+
+        private Bitmap RenderFrame(Image sprite, int floatY)
+        {
+            int size = Width;
+            var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+                // Subtle celestial aura glow behind the slime
+                int auraPad = 10;
+                var auraRect = new Rectangle(auraPad, auraPad + floatY, size - auraPad * 2, size - auraPad * 2);
+                using (var path = new GraphicsPath())
+                {
+                    path.AddEllipse(auraRect);
+                    using (var pgb = new PathGradientBrush(path))
+                    {
+                        pgb.CenterColor = Color.FromArgb(45, 0, 220, 255);
+                        pgb.SurroundColors = new[] { Color.FromArgb(0, 0, 0, 0) };
+                        g.FillEllipse(pgb, auraRect);
+                    }
+                }
+
+                // Render Mascot Sprite Frame
+                g.DrawImage(sprite, 4, 4 + floatY, size - 8, size - 8);
+            }
+
+            // Pre-multiply alpha for UpdateLayeredWindow (once per cached frame)
+            unsafe
+            {
+                var data = bmp.LockBits(new Rectangle(0, 0, size, size), ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+                byte* scan0 = (byte*)data.Scan0.ToPointer();
+                int total = data.Stride * size;
+                for (int i = 0; i < total; i += 4)
+                {
+                    byte b = scan0[i];
+                    byte gVal = scan0[i + 1];
+                    byte r = scan0[i + 2];
+                    byte a = scan0[i + 3];
+
+                    if (a == 0)
+                    {
+                        scan0[i] = scan0[i + 1] = scan0[i + 2] = 0;
+                    }
+                    else if (a < 255)
+                    {
+                        scan0[i]     = (byte)((b * a) / 255);
+                        scan0[i + 1] = (byte)((gVal * a) / 255);
+                        scan0[i + 2] = (byte)((r * a) / 255);
+                    }
+                }
+                bmp.UnlockBits(data);
+            }
+
+            return bmp;
         }
 
         private void SetLayeredBitmap(Bitmap bmp)
@@ -498,6 +540,8 @@ namespace NoFences.UI
                 _mainTimer?.Stop();
                 _mainTimer?.Dispose();
                 _mascotMenu?.Dispose();
+                foreach (var cached in _frameCache.Values) cached.Dispose();
+                _frameCache.Clear();
             }
             base.Dispose(disposing);
         }

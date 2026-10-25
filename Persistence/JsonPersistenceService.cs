@@ -17,15 +17,18 @@ namespace NoFences.Persistence
         List<FenceInfo> LoadAllFences();
         void DeleteFence(Guid fenceId);
         bool FenceExists(Guid fenceId);
+        /// <summary>Writes any pending debounced saves to disk immediately.</summary>
+        void Flush();
     }
 
-    public class JsonPersistenceService : IPersistenceService
+    public class JsonPersistenceService : IPersistenceService, IDisposable
     {
         private const string MetaFileName = "fence.json";
         private readonly string _basePath;
         private readonly JsonSerializerSettings _jsonSettings;
         private readonly ILoggingService _loggingService;
         private readonly object _fileLock = new object();
+        private readonly DeferredFileWriter _writer;
 
         public JsonPersistenceService(ILoggingService loggingService)
         {
@@ -44,6 +47,9 @@ namespace NoFences.Persistence
                 DefaultValueHandling = DefaultValueHandling.Populate
             };
 
+            _writer = new DeferredFileWriter(TimeSpan.FromMilliseconds(750),
+                (path, ex) => _loggingService.LogError($"Failed to save {path}: {ex.Message}", ex));
+
             EnsureDirectoryExists(_basePath);
         }
 
@@ -52,55 +58,24 @@ namespace NoFences.Persistence
             if (fenceInfo == null)
                 throw new ArgumentNullException(nameof(fenceInfo));
 
-            var fencePath = GetFencePath(fenceInfo.Id);
-            EnsureDirectoryExists(fencePath);
-
-            var metaFile = Path.Combine(fencePath, MetaFileName);
-            var tempFile = Path.Combine(fencePath, MetaFileName + ".tmp");
+            // Serialize now (consistent snapshot on the caller's thread); the disk write is
+            // debounced, coalesced and performed atomically on a background thread.
             var json = JsonConvert.SerializeObject(fenceInfo, _jsonSettings);
+            _writer.Schedule(GetMetaFile(fenceInfo.Id), json);
+        }
 
-            lock (_fileLock)
-            {
-                try
-                {
-                    // Atomic write: write to temp file first, then replace live file
-                    File.WriteAllText(tempFile, json);
-                    if (File.Exists(metaFile))
-                    {
-                        File.Delete(metaFile);
-                    }
-                    File.Move(tempFile, metaFile);
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.LogError($"Failed to save fence {fenceInfo.Name} atomically: {ex.Message}", ex);
-                    // Fallback direct write
-                    File.WriteAllText(metaFile, json);
-                }
-            }
+        public void Flush()
+        {
+            _writer.Flush();
         }
 
         public FenceInfo LoadFence(Guid fenceId)
         {
-            var fencePath = GetFencePath(fenceId);
-            var metaFile = Path.Combine(fencePath, MetaFileName);
-
-            if (!File.Exists(metaFile))
-                return null;
-
-            lock (_fileLock)
-            {
-                try
-                {
-                    var json = File.ReadAllText(metaFile);
-                    return JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings);
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.LogError($"Failed to load fence {fenceId}: {ex.Message}", ex);
-                    return null;
-                }
-            }
+            var fence = AtomicFile.ReadWithRecovery(GetMetaFile(fenceId),
+                json => JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings));
+            if (fence == null && File.Exists(GetMetaFile(fenceId)))
+                _loggingService.LogError($"Failed to load fence {fenceId}: unreadable fence.json and no valid backup");
+            return fence;
         }
 
         public List<FenceInfo> LoadAllFences()
@@ -113,27 +88,15 @@ namespace NoFences.Persistence
             foreach (var dir in Directory.EnumerateDirectories(_basePath))
             {
                 var metaFile = Path.Combine(dir, MetaFileName);
-                if (File.Exists(metaFile))
-                {
-                    try
-                    {
-                        string json;
-                        lock (_fileLock)
-                        {
-                            json = File.ReadAllText(metaFile);
-                        }
-                        var fence = JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings);
-                        if (fence != null)
-                        {
-                            fences.Add(fence);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _loggingService.LogWarning($"Failed to load fence from {metaFile}: {ex.Message}");
-                        continue;
-                    }
-                }
+                if (!File.Exists(metaFile) && !File.Exists(metaFile + ".bak"))
+                    continue;
+
+                var fence = AtomicFile.ReadWithRecovery(metaFile,
+                    json => JsonConvert.DeserializeObject<FenceInfo>(json, _jsonSettings));
+                if (fence != null)
+                    fences.Add(fence);
+                else
+                    _loggingService.LogWarning($"Failed to load fence from {metaFile}");
             }
 
             return fences;
@@ -142,6 +105,8 @@ namespace NoFences.Persistence
         public void DeleteFence(Guid fenceId)
         {
             var fencePath = GetFencePath(fenceId);
+            // Avoid a pending write resurrecting the directory after deletion
+            _writer.Discard(GetMetaFile(fenceId));
             lock (_fileLock)
             {
                 if (Directory.Exists(fencePath))
@@ -158,11 +123,19 @@ namespace NoFences.Persistence
             }
         }
 
+        public void Dispose()
+        {
+            _writer.Dispose();
+        }
+
         public bool FenceExists(Guid fenceId)
         {
-            var fencePath = GetFencePath(fenceId);
-            var metaFile = Path.Combine(fencePath, MetaFileName);
-            return File.Exists(metaFile);
+            return File.Exists(GetMetaFile(fenceId)) || _writer.HasPending(GetMetaFile(fenceId));
+        }
+
+        private string GetMetaFile(Guid fenceId)
+        {
+            return Path.Combine(GetFencePath(fenceId), MetaFileName);
         }
 
         private string GetFencePath(Guid fenceId)

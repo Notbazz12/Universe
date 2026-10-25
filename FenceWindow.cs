@@ -33,10 +33,6 @@ namespace NoFences
 
         private string selectedItem;
         private string hoveringItem;
-        private bool shouldUpdateSelection;
-        private bool shouldRunDoubleClick;
-        private bool hasSelectionUpdated;
-        private bool hasHoverUpdated;
         private bool isMinified;
         private int prevHeight;
 
@@ -46,17 +42,28 @@ namespace NoFences
         private bool isHovered;
         private bool isDragOverActive;
         private TextBox searchBox;
+        private Font searchFont;
         private bool isSearchActive;
         private bool isMascotLoveActive;
         private System.Windows.Forms.Timer mascotLoveTimer;
         private readonly List<FenceEntry> filteredEntries = new List<FenceEntry>();
 
-        private readonly ThrottledExecution throttledMove = new ThrottledExecution(TimeSpan.FromMilliseconds(500));
-        private readonly ThrottledExecution throttledResize = new ThrottledExecution(TimeSpan.FromMilliseconds(300));
+        // Trailing-edge debounce: persist once after a drag/resize ends instead of every few hundred ms
+        private readonly Debouncer debounceMove = new Debouncer(400);
+        private readonly Debouncer debounceResize = new Debouncer(400);
 
         private readonly ShellContextMenu shellContextMenu = new ShellContextMenu();
 
-        private readonly ThumbnailProvider thumbnailProvider = new ThumbnailProvider();
+        // Layout cache: item rectangles in client coordinates (no scroll, no header offset).
+        // Shared by painting, hit-testing and hover so the math lives in one place.
+        private Rectangle[] _itemRects = new Rectangle[0];
+        private bool _layoutDirty = true;
+        private int _layoutKey;
+        private int _contentBottom;
+        private int _hoverIndex = -1;
+        private int _fontVersion;
+        private int _iconInvalidatePending;
+        private readonly UI.CyberGlassRenderer.ContainerCache _glassCache = new UI.CyberGlassRenderer.ContainerCache();
         
         // Innovative Features
         private BreathingEffect breathingEffect;
@@ -76,6 +83,8 @@ namespace NoFences
 
         private void ReloadFonts()
         {
+            var oldTitle = titleFont;
+            var oldItem = iconFont;
             try {
                 titleFont = new Font(fenceInfo.TitleFontName, fenceInfo.TitleFontSize);
                 iconFont = new Font(fenceInfo.ItemFontName, fenceInfo.ItemFontSize);
@@ -84,6 +93,10 @@ namespace NoFences
                 titleFont = new Font("Segoe UI", 12);
                 iconFont = new Font("Segoe UI", 9);
             }
+            oldTitle?.Dispose();
+            oldItem?.Dispose();
+            _fontVersion++;
+            _layoutDirty = true;
         }
 
         public FenceWindow(FenceInfo fenceInfo)
@@ -95,7 +108,8 @@ namespace NoFences
             // Enable double buffering for smooth rendering
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | 
                           ControlStyles.AllPaintingInWmPaint | 
-                          ControlStyles.UserPaint, true);
+                          ControlStyles.UserPaint |
+                          ControlStyles.ResizeRedraw, true);
             this.UpdateStyles();
             
             var config = AppConfig.Load();
@@ -117,7 +131,7 @@ namespace NoFences
             titleHeight = LogicalToDeviceUnits(logicalTitleHeight);
             
             this.MouseWheel += FenceWindow_MouseWheel;
-            thumbnailProvider.IconThumbnailLoaded += ThumbnailProvider_IconThumbnailLoaded;
+            IconCache.Shared.Loaded += IconCache_Loaded;
 
             // FIX: Load the icon from the running executable itself (universe.ico is embedded
             // via <ApplicationIcon> in the .csproj). This is reliable regardless of CWD.
@@ -187,7 +201,7 @@ namespace NoFences
                 BackColor = Color.FromArgb(20, 24, 38),
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = new Font("Segoe UI", 9f),
+                Font = searchFont = new Font("Segoe UI", 9f),
                 Height = 22,
                 Location = new Point(10, (titleHeight - 22) / 2),
                 Width = Math.Max(120, Width - 60)
@@ -241,8 +255,33 @@ namespace NoFences
 
         public void ReloadFiles()
         {
-            UpdateCachedEntries();
-            Refresh();
+            UpdateCachedEntries(true);
+            Invalidate();
+        }
+
+        /// <summary>Runs any debounced move/resize save right now (call before the app exits).</summary>
+        public void FlushPendingSave()
+        {
+            if (IsDisposed) return;
+            debounceMove.Flush();
+            debounceResize.Flush();
+        }
+
+        /// <summary>
+        /// Adds a file on the UI thread (called by background services such as the smart sorter,
+        /// which must not mutate the file list while the UI enumerates it).
+        /// </summary>
+        public void TryAddFile(string filePath)
+        {
+            if (IsDisposed || string.IsNullOrEmpty(filePath)) return;
+            if (!FenceFilterHelper.MatchesFilter(filePath, fenceInfo.FilterType)) return;
+            if (fenceInfo.Files.Contains(filePath)) return;
+
+            fenceInfo.Files.Add(filePath);
+            cachedMagicColor = null;
+            if (fenceInfo.EnableBreathingEffect && breathingEffect != null)
+                breathingEffect.StartBreathing();
+            SaveAndRebuild();
         }
 
         protected override void WndProc(ref Message m)
@@ -293,7 +332,9 @@ namespace NoFences
                 if ((int)m.Result == HTCLIENT && pt.Y < titleHeight)     // drag the form
                 {
                     m.Result = (IntPtr)HTCAPTION;
-                    FenceWindow_MouseEnter(null, null);
+                    UpdateHover(pt);                       // pointer left the item area (caption does not raise MouseMove)
+                    if (!isHovered)
+                        FenceWindow_MouseEnter(null, null);
                 }
 
                 if (pt.X < 10 && pt.Y < 10)
@@ -330,7 +371,7 @@ namespace NoFences
                 {
                     RemoveFileFromFence(selectedItem);
                     selectedItem = null;
-                    Refresh();
+                    Invalidate();
                 }
                 return true;
             }
@@ -351,7 +392,7 @@ namespace NoFences
             if (keyData == Keys.Escape && !string.IsNullOrEmpty(selectedItem))
             {
                 selectedItem = null;
-                Refresh();
+                Invalidate();
                 return true;
             }
 
@@ -368,7 +409,7 @@ namespace NoFences
                 if (historyService != null && historyService.CanUndo)
                 {
                     historyService.Undo();
-                    Refresh();
+                    Invalidate();
                 }
                 return true;
             }
@@ -379,7 +420,7 @@ namespace NoFences
                 if (historyService != null && historyService.CanRedo)
                 {
                     historyService.Redo();
-                    Refresh();
+                    Invalidate();
                 }
                 return true;
             }
@@ -417,7 +458,7 @@ namespace NoFences
             RemoveFileFromFence(target);
             hoveringItem = null;
             contextMenuItemTarget = null;
-            Refresh();
+            Invalidate();
         }
 
         private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
@@ -434,7 +475,7 @@ namespace NoFences
             {
                 fenceInfo.Files.Remove(item);
                 cachedMagicColor = null; // Invalidate cache
-                Save();
+                SaveAndRebuild();
             }
         }
 
@@ -558,8 +599,7 @@ namespace NoFences
                 {
                     breathingEffect.StartBreathing();
                 }
-                Save();
-                Refresh();
+                SaveAndRebuild();
             }
         }
 
@@ -567,7 +607,7 @@ namespace NoFences
         {
             if (fenceInfo == null) return;
 
-            throttledResize.Run(() =>
+            debounceResize.Run(() =>
             {
                 if (fenceInfo == null || IsDisposed) return;
                 fenceInfo.Width = Width;
@@ -575,21 +615,50 @@ namespace NoFences
                 Save();
             });
 
-            Refresh();
+            Invalidate();
         }
 
         private void FenceWindow_MouseMove(object sender, MouseEventArgs e)
         {
-            // Only invalidate when hover state changes, not on every pixel of movement.
-            // HitTestItem returns the path under the cursor (or null), matching
-            // how the Paint loop determines hoveringItem.
-            var newHover = HitTestItem(e.Location);
-            if (newHover != hoveringItem)
-            {
-                hoveringItem = newHover;
-                hasHoverUpdated = true;
-                Invalidate();
-            }
+            UpdateHover(e.Location);
+        }
+
+        private Rectangle HeaderRect => new Rectangle(0, 0, Width, fenceInfo.ShowHeader ? titleHeight : 0);
+
+        /// <summary>
+        /// Updates the hovered item and repaints only the two items involved (plus the header
+        /// when the mascot reacts to hover), instead of the whole window.
+        /// </summary>
+        private void UpdateHover(Point pt)
+        {
+            int idx = HitTestIndex(pt);
+            if (idx == _hoverIndex) return;
+
+            int old = _hoverIndex;
+            _hoverIndex = idx;
+            hoveringItem = idx >= 0 ? filteredEntries[idx].Path : null;
+
+            InvalidateItem(old);
+            InvalidateItem(idx);
+            if (fenceInfo.ShowMascot && fenceInfo.ShowHeader)
+                Invalidate(HeaderRect);
+        }
+
+        /// <summary>Forces the hover to be recomputed after scroll / zoom / layout changes.</summary>
+        private void RecomputeHover()
+        {
+            _hoverIndex = -1;
+            hoveringItem = null;
+            UpdateHover(PointToClient(MousePosition));
+        }
+
+        private void InvalidateItem(int index)
+        {
+            if (index < 0 || index >= _itemRects.Length) return;
+            var r = _itemRects[index];
+            r.Offset(0, (fenceInfo.ShowHeader ? titleHeight : 0) - scrollOffset);
+            r.Inflate(6, 6);
+            Invalidate(r);
         }
 
         private static readonly int[] AvailableIconSizes = new[] { 16, 20, 24, 32, 40, 48, 64 };
@@ -607,39 +676,71 @@ namespace NoFences
             return iconSize + itemPadding + fontH + 8;
         }
 
-        /// <summary>
-        /// Returns the file path of the entry under <paramref name="pt"/>,
-        /// or null if the cursor is not over any item.
-        /// Uses the same layout math as the Paint loop.
-        /// </summary>
-        private string HitTestItem(Point pt)
-        {
-            if (filteredEntries == null || filteredEntries.Count == 0) return null;
+        private int CurrentIconSize => fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
 
+        /// <summary>Recomputes item rectangles and scroll bounds only when something affecting them changed.</summary>
+        private void EnsureLayout()
+        {
+            int icon = CurrentIconSize;
             int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
-            int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
-            int currentItemWidth  = CalculateItemWidth(currentIconSize);
-            int currentItemHeight = CalculateItemHeight(currentIconSize);
+
+            int key;
+            unchecked
+            {
+                key = 17;
+                key = key * 31 + Width;
+                key = key * 31 + Height;
+                key = key * 31 + icon;
+                key = key * 31 + filteredEntries.Count;
+                key = key * 31 + effectiveTitleHeight;
+                key = key * 31 + (iconFont != null ? iconFont.Height : 0);
+            }
+            if (!_layoutDirty && key == _layoutKey) return;
+
+            int w = CalculateItemWidth(icon);
+            int h = CalculateItemHeight(icon);
+
+            if (_itemRects.Length != filteredEntries.Count)
+                _itemRects = new Rectangle[filteredEntries.Count];
 
             int x = itemPadding;
             int y = itemPadding;
-
-            foreach (var entry in filteredEntries)
+            for (int i = 0; i < _itemRects.Length; i++)
             {
-                int itemX = x;
-                int itemY = y + effectiveTitleHeight - scrollOffset;
-                var rect = new Rectangle(itemX, itemY, currentItemWidth, currentItemHeight);
-                if (rect.Contains(pt))
-                    return entry.Path;
-
-                x += currentItemWidth + itemPadding;
-                if (x + currentItemWidth > Width)
+                _itemRects[i] = new Rectangle(x, y, w, h);
+                x += w + itemPadding;
+                if (x + w > Width)
                 {
                     x = itemPadding;
-                    y += currentItemHeight + itemPadding;
+                    y += h + itemPadding;
                 }
             }
-            return null;
+
+            _contentBottom = _itemRects.Length == 0 ? 0 : _itemRects[_itemRects.Length - 1].Bottom;
+            scrollHeight = _contentBottom - (ClientRectangle.Height - effectiveTitleHeight);
+            scrollOffset = scrollHeight > 0 ? Math.Min(scrollOffset, scrollHeight) : 0;
+
+            _layoutKey = key;
+            _layoutDirty = false;
+        }
+
+        /// <summary>Index of the entry under <paramref name="pt"/> (client coordinates), or -1.</summary>
+        private int HitTestIndex(Point pt)
+        {
+            if (filteredEntries.Count == 0) return -1;
+            EnsureLayout();
+
+            int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
+            if (pt.Y < effectiveTitleHeight) return -1;
+
+            int dy = effectiveTitleHeight - scrollOffset;
+            for (int i = 0; i < _itemRects.Length; i++)
+            {
+                var r = _itemRects[i];
+                r.Offset(0, dy);
+                if (r.Contains(pt)) return i;
+            }
+            return -1;
         }
 
         private void FenceWindow_MouseEnter(object sender, EventArgs e)
@@ -668,6 +769,8 @@ namespace NoFences
 
             Minify();
             selectedItem = null;
+            _hoverIndex = -1;
+            hoveringItem = null;
             Invalidate();
         }
 
@@ -678,7 +781,7 @@ namespace NoFences
                 isMinified = true;
                 prevHeight = Height;
                 Height = titleHeight;
-                Refresh();
+                Invalidate();
             }
         }
 
@@ -695,8 +798,12 @@ namespace NoFences
 
         private void FenceWindow_Click(object sender, EventArgs e)
         {
-            shouldUpdateSelection = true;
-            Refresh();
+            UpdateHover(PointToClient(MousePosition));
+            var newSelection = _hoverIndex >= 0 ? filteredEntries[_hoverIndex].Path : null;
+            if (newSelection == selectedItem) return;
+
+            selectedItem = newSelection;
+            Invalidate();
         }
 
         private void FenceWindow_DoubleClick(object sender, EventArgs e)
@@ -725,32 +832,38 @@ namespace NoFences
                 return;
             }
 
-            shouldRunDoubleClick = true;
-            Refresh();
+            UpdateHover(PointToClient(MousePosition));
+            if (_hoverIndex >= 0)
+                filteredEntries[_hoverIndex].Open();
         }
 
         private static readonly SolidBrush textShadowBrush = new SolidBrush(Color.FromArgb(180, 10, 10, 15));
         private static readonly SolidBrush scrollbarBrush = new SolidBrush(Color.FromArgb(150, Color.Black));
+        private static readonly SolidBrush cyberScrollbarBrush = new SolidBrush(Color.FromArgb(90, UI.CyberGlassRenderer.IridescentViolet));
+        private static readonly Pen headerSeparatorPen = new Pen(Color.FromArgb(30, 255, 255, 255), 1.0f);
         private static readonly StringFormat entryStringFormat = new StringFormat { Alignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
         private static readonly StringFormat titleAlignLeft = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
         private static readonly StringFormat titleAlignCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         private static readonly StringFormat titleAlignRight = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
 
+        // Paint only draws: all input (hover, selection, double click) is handled in mouse events.
         private void FenceWindow_Paint(object sender, PaintEventArgs e)
         {
-            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var g = e.Graphics;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
             bool isCyberGlass = fenceInfo.Theme == "CyberGlass" || string.IsNullOrEmpty(fenceInfo.Theme);
 
             if (isCyberGlass)
             {
                 UI.CyberGlassRenderer.RenderCyberGlassContainer(
-                    e.Graphics,
+                    g,
                     ClientRectangle,
                     isHovered,
                     isDragOverActive,
-                    fenceInfo.CornerRadius > 0 ? fenceInfo.CornerRadius : 10
+                    fenceInfo.CornerRadius > 0 ? fenceInfo.CornerRadius : 10,
+                    _glassCache
                 );
             }
             else
@@ -768,28 +881,25 @@ namespace NoFences
 
                 using (var bgBrush = new SolidBrush(bgColor))
                 {
-                    e.Graphics.FillRectangle(bgBrush, ClientRectangle);
+                    g.FillRectangle(bgBrush, ClientRectangle);
                 }
             }
 
             // Title Header
             int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
-            
+
             if (fenceInfo.ShowHeader)
             {
                 if (isCyberGlass)
                 {
                     // Subtle Glass Header division line
-                    using (var sepPen = new Pen(Color.FromArgb(30, 255, 255, 255), 1.0f))
-                    {
-                        e.Graphics.DrawLine(sepPen, 10, titleHeight - 1, Width - 10, titleHeight - 1);
-                    }
+                    g.DrawLine(headerSeparatorPen, 10, titleHeight - 1, Width - 10, titleHeight - 1);
                 }
                 else
                 {
                     using (var titleBgBrush = new SolidBrush(Color.FromArgb(fenceInfo.TitleColor)))
                     {
-                        e.Graphics.FillRectangle(titleBgBrush, new RectangleF(0, 0, Width, titleHeight));
+                        g.FillRectangle(titleBgBrush, new RectangleF(0, 0, Width, titleHeight));
                     }
                 }
 
@@ -797,23 +907,30 @@ namespace NoFences
                 {
                     var align = fenceInfo.TitleAlignment == 0 ? titleAlignLeft :
                                 fenceInfo.TitleAlignment == 2 ? titleAlignRight : titleAlignCenter;
-                    
+
                     var titleRect = new RectangleF(14, 0, Width - 28, titleHeight);
 
-                    using (var titleTextBrush = new SolidBrush(isCyberGlass ? Color.White : Color.FromArgb(fenceInfo.TitleTextColor)))
+                    if (isCyberGlass)
                     {
-                        e.Graphics.DrawString(Text, titleFont, titleTextBrush, titleRect, align);
+                        g.DrawString(Text, titleFont, Brushes.White, titleRect, align);
+                    }
+                    else
+                    {
+                        using (var titleTextBrush = new SolidBrush(Color.FromArgb(fenceInfo.TitleTextColor)))
+                        {
+                            g.DrawString(Text, titleFont, titleTextBrush, titleRect, align);
+                        }
                     }
 
                     // Iridescent Pill Item Counter Badge
                     if (isCyberGlass && fenceInfo.ShowItemCountBadge)
                     {
-                        string badgeText = $"{filteredEntries.Count}";
+                        string badgeText = filteredEntries.Count.ToString();
                         int badgeW = 28 + (badgeText.Length > 2 ? 10 : 0);
                         int badgeH = 18;
                         int badgeX = Width - badgeW - 12;
                         int badgeY = (titleHeight - badgeH) / 2;
-                        UI.CyberGlassRenderer.RenderPillBadge(e.Graphics, new Rectangle(badgeX, badgeY, badgeW, badgeH), badgeText, countBadgeFont, UI.CyberGlassRenderer.IridescentCyan);
+                        UI.CyberGlassRenderer.RenderPillBadge(g, new Rectangle(badgeX, badgeY, badgeW, badgeH), badgeText, countBadgeFont, UI.CyberGlassRenderer.IridescentCyan);
                     }
 
                     // Cosmic Mascot Companion
@@ -830,103 +947,65 @@ namespace NoFences
                             int mascotSize = Math.Max(26, titleHeight - 4);
                             int mascotX = (isCyberGlass && fenceInfo.ShowItemCountBadge) ? Width - 72 : Width - mascotSize - 12;
                             int mascotY = (titleHeight - mascotSize) / 2;
-                            e.Graphics.DrawImage(mascotImg, new Rectangle(mascotX, mascotY, mascotSize, mascotSize));
+                            g.DrawImage(mascotImg, new Rectangle(mascotX, mascotY, mascotSize, mascotSize));
                         }
                     }
                 }
             }
 
             // Items
-            int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
+            int currentIconSize = CurrentIconSize;
             int currentItemWidth = CalculateItemWidth(currentIconSize);
-            int currentItemHeight = CalculateItemHeight(currentIconSize);
+            EnsureLayout();
 
-            var x = itemPadding;
-            var y = itemPadding;
-            scrollHeight = 0;
-            
-            var originalClip = e.Graphics.Clip;
-            e.Graphics.SetClip(new Rectangle(0, effectiveTitleHeight, Width, Height - effectiveTitleHeight));
-            
-            foreach (var entry in filteredEntries)
+            var clipState = g.Save();
+            g.SetClip(new Rectangle(0, effectiveTitleHeight, Width, Math.Max(0, Height - effectiveTitleHeight)), System.Drawing.Drawing2D.CombineMode.Intersect);
+
+            int dy = effectiveTitleHeight - scrollOffset;
+            var dirty = e.ClipRectangle;
+            for (int i = 0; i < _itemRects.Length; i++)
             {
-                RenderEntry(e.Graphics, entry, x, y + effectiveTitleHeight - scrollOffset, currentItemWidth, currentIconSize, isCyberGlass);
+                var r = _itemRects[i];
+                r.Offset(0, dy);
 
-                var itemBottom = y + currentItemHeight;
-                if (itemBottom > scrollHeight)
-                    scrollHeight = itemBottom;
+                // Skip items outside the invalidated area / scrolled out of view
+                var bounds = r;
+                bounds.Inflate(6, 6);
+                if (!bounds.IntersectsWith(dirty)) continue;
 
-                x += currentItemWidth + itemPadding;
-                if (x + currentItemWidth > Width)
-                {
-                    x = itemPadding;
-                    y += currentItemHeight + itemPadding;
-                }
+                var entry = filteredEntries[i];
+                RenderEntry(g, entry, r.X, r.Y, currentItemWidth, currentIconSize, isCyberGlass, i == _hoverIndex, entry.Path == selectedItem);
             }
 
-            e.Graphics.Clip = originalClip;
+            g.Restore(clipState);
 
-            scrollHeight -= (ClientRectangle.Height - effectiveTitleHeight);
-
-            // Scroll bars
+            // Scroll bar
             if (scrollHeight > 0)
             {
                 var contentHeight = Height - effectiveTitleHeight;
                 var scrollbarHeight = contentHeight - scrollHeight;
-                using (var sbBrush = isCyberGlass ? new SolidBrush(Color.FromArgb(90, UI.CyberGlassRenderer.IridescentViolet)) : (SolidBrush)scrollbarBrush)
-                {
-                    e.Graphics.FillRectangle(sbBrush, new Rectangle(Width - 4, effectiveTitleHeight + scrollOffset, 4, Math.Max(12, scrollbarHeight)));
-                }
-
-                scrollOffset = Math.Min(scrollOffset, scrollHeight);
+                g.FillRectangle(isCyberGlass ? cyberScrollbarBrush : scrollbarBrush,
+                    new Rectangle(Width - 4, effectiveTitleHeight + scrollOffset, 4, Math.Max(12, scrollbarHeight)));
             }
-
-            if (shouldUpdateSelection && !hasSelectionUpdated)
-                selectedItem = null;
-
-            if (!hasHoverUpdated)
-                hoveringItem = null;
-
-            shouldRunDoubleClick = false;
-            shouldUpdateSelection = false;
-            hasSelectionUpdated = false;
-            hasHoverUpdated = false;
         }
 
-        private void RenderEntry(Graphics g, FenceEntry entry, int x, int y, int width, int iconSize, bool isCyberGlass)
+        private void RenderEntry(Graphics g, FenceEntry entry, int x, int y, int width, int iconSize, bool isCyberGlass, bool mouseOver, bool isSelected)
         {
-            var icon = entry.ExtractIcon(thumbnailProvider);
+            var icon = entry.ExtractIcon();
             var name = entry.Name;
 
             var textPosition = new PointF(x, y + iconSize + 5);
             var textMaxSize = new SizeF(width, iconFont.Height * 2);
 
-            var textSize = g.MeasureString(name, iconFont, textMaxSize, entryStringFormat);
-            var outlineRect = new Rectangle(x - 2, y - 2, width + 2, iconSize + (int)textSize.Height + 5 + 2);
-
-            var mousePos = PointToClient(MousePosition);
-            var mouseOver = mousePos.X >= x && mousePos.Y >= y && mousePos.X < x + outlineRect.Width && mousePos.Y < y + outlineRect.Height;
-
-            if (mouseOver)
+            // The name height only changes with item width / font: measure once per entry, not per paint
+            int textKey;
+            unchecked { textKey = (width * 1000 + iconFont.Height) * 31 + _fontVersion; }
+            if (entry.TextHeight < 0 || entry.TextHeightKey != textKey)
             {
-                hoveringItem = entry.Path;
-                hasHoverUpdated = true;
+                entry.TextHeight = (int)g.MeasureString(name, iconFont, textMaxSize, entryStringFormat).Height;
+                entry.TextHeightKey = textKey;
             }
-
-            if (mouseOver && shouldUpdateSelection)
-            {
-                selectedItem = entry.Path;
-                shouldUpdateSelection = false;
-                hasSelectionUpdated = true;
-            }
-
-            if (mouseOver && shouldRunDoubleClick)
-            {
-                shouldRunDoubleClick = false;
-                entry.Open();
-            }
-
-            bool isSelected = selectedItem == entry.Path;
+            var outlineRect = new Rectangle(x - 2, y - 2, width + 2, iconSize + entry.TextHeight + 5 + 2);
 
             if (isCyberGlass)
             {
@@ -947,7 +1026,7 @@ namespace NoFences
             {
                 g.DrawIcon(icon, new Rectangle(x + width / 2 - iconSize / 2, y, iconSize, iconSize));
             }
-            
+
             // Draw Text
             g.DrawString(name, iconFont, textShadowBrush, new RectangleF(textPosition.Move(shadowDist, shadowDist), textMaxSize), entryStringFormat);
             g.DrawString(name, iconFont, Brushes.White, new RectangleF(textPosition, textMaxSize), entryStringFormat);
@@ -972,7 +1051,7 @@ namespace NoFences
 
                 Text = dialog.NewName;
                 fenceInfo.Name = Text;
-                Refresh();
+                Invalidate();
                 Save();
             }
         }
@@ -1011,8 +1090,7 @@ namespace NoFences
 
                         if (count > 0)
                         {
-                            Save();
-                            Refresh();
+                            SaveAndRebuild();
                             MessageBox.Show(this, $"Successfully imported {count} items.", "Import Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         else
@@ -1039,17 +1117,32 @@ namespace NoFences
                 Application.Exit();
         }
 
-        private readonly object saveLock = new object();
-        private List<FenceEntry> cachedEntries = new List<FenceEntry>();
+        private readonly List<FenceEntry> cachedEntries = new List<FenceEntry>();
 
-        private void UpdateCachedEntries()
+        /// <summary>
+        /// Rebuilds the entry list from fenceInfo.Files, reusing existing entries (and so their
+        /// loaded icons) and only touching the disk for files that are new. With
+        /// <paramref name="revalidate"/> existing entries are re-checked against the file system.
+        /// </summary>
+        private void UpdateCachedEntries(bool revalidate = false)
         {
+            var existing = new Dictionary<string, FenceEntry>(cachedEntries.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var cached in cachedEntries)
+                existing[cached.Path] = cached;
+
             cachedEntries.Clear();
             foreach (var file in fenceInfo.Files)
             {
-                var entry = FenceEntry.FromPath(file);
-                if (entry != null)
+                if (existing.TryGetValue(file, out var entry) && !revalidate)
+                {
                     cachedEntries.Add(entry);
+                    continue;
+                }
+
+                // New file (or revalidation): hit the file system once
+                var fresh = FenceEntry.FromPath(file);
+                if (fresh != null)
+                    cachedEntries.Add(existing.TryGetValue(file, out entry) ? entry : fresh);
             }
             UpdateFilteredEntries(searchBox != null && isSearchActive ? searchBox.Text : null);
         }
@@ -1078,22 +1171,31 @@ namespace NoFences
                     }
                 }
             }
+
+            _layoutDirty = true;
+            _hoverIndex = -1;
+            hoveringItem = null;
         }
 
+        /// <summary>Persists the fence (serialize + debounced background write). Cheap; safe to call often.</summary>
         private void Save()
         {
-            lock (saveLock)
-            {
-                FenceManager.Instance.UpdateFence(fenceInfo);
-                UpdateCachedEntries();
-            }
+            FenceManager.Instance.UpdateFence(fenceInfo);
+        }
+
+        /// <summary>Persists and rebuilds the entry list; use when Files or FilterType changed.</summary>
+        private void SaveAndRebuild()
+        {
+            Save();
+            UpdateCachedEntries();
+            Invalidate();
         }
 
         private void FenceWindow_LocationChanged(object sender, EventArgs e)
         {
             if (fenceInfo == null) return;
 
-            throttledMove.Run(() =>
+            debounceMove.Run(() =>
             {
                 if (fenceInfo == null || IsDisposed) return;
                 fenceInfo.PosX = Location.X;
@@ -1168,6 +1270,7 @@ namespace NoFences
                 {
                     fenceInfo.IconSize = s;
                     Save();
+                    RecomputeHover();
                     Invalidate();
                 };
                 iconSizeSubMenu.DropDownItems.Add(sizeOption);
@@ -1251,8 +1354,9 @@ namespace NoFences
         {
             var settings = new NoFences.UI.SettingsWindow(fenceInfo, () => 
             {
-                Save();
-                Refresh();
+                ReloadFonts();
+                cachedMagicColor = null;
+                SaveAndRebuild();
             });
             settings.Show();
             settings.BringToFront();
@@ -1273,7 +1377,7 @@ namespace NoFences
                 {
                     Height = titleHeight;
                 }
-                Refresh();
+                Invalidate();
                 Save();
             }
         }
@@ -1378,12 +1482,14 @@ namespace NoFences
                 {
                     fenceInfo.IconSize = AvailableIconSizes[idx + 1];
                     Save();
+                    RecomputeHover();
                     Invalidate();
                 }
                 else if (e.Delta < 0 && idx > 0)
                 {
                     fenceInfo.IconSize = AvailableIconSizes[idx - 1];
                     Save();
+                    RecomputeHover();
                     Invalidate();
                 }
                 return;
@@ -1398,66 +1504,33 @@ namespace NoFences
             if (scrollOffset > scrollHeight)
                 scrollOffset = scrollHeight;
 
+            RecomputeHover();
             Invalidate();
         }
 
-        private void ThumbnailProvider_IconThumbnailLoaded(object sender, EventArgs e)
+        // Raised on the icon loader thread; coalesce bursts into a single repaint on the UI thread
+        private void IconCache_Loaded(object sender, EventArgs e)
         {
             if (IsDisposed || Disposing) return;
+            if (System.Threading.Interlocked.Exchange(ref _iconInvalidatePending, 1) == 1) return;
 
-            if (InvokeRequired)
+            try
             {
-                try { BeginInvoke(new Action(Invalidate)); } catch { }
+                BeginInvoke(new Action(() =>
+                {
+                    _iconInvalidatePending = 0;
+                    if (!IsDisposed) Invalidate();
+                }));
             }
-            else
+            catch (InvalidOperationException)
             {
-                Invalidate();
+                _iconInvalidatePending = 0; // handle not created / already destroyed
             }
         }
 
         private bool ItemExists(string path)
         {
             return File.Exists(path) || Directory.Exists(path);
-        }
-
-        /// <summary>
-        /// Gets the rectangle of the item at the specified point, or Empty if no item found
-        /// </summary>
-        private Rectangle GetItemRectAtPoint(Point point)
-        {
-            int effectiveTitleHeight = fenceInfo.ShowHeader ? titleHeight : 0;
-            int currentIconSize = fenceInfo.IconSize > 0 ? fenceInfo.IconSize : 32;
-            int currentItemWidth = CalculateItemWidth(currentIconSize);
-            int currentItemHeight = CalculateItemHeight(currentIconSize);
-
-            var x = itemPadding;
-            var y = itemPadding;
-
-            using (var g = CreateGraphics())
-            {
-                foreach (var entry in filteredEntries)
-                {
-                    var textMaxSize = new SizeF(currentItemWidth, iconFont.Height * 2);
-                    var textSize = g.MeasureString(entry.Name, iconFont, textMaxSize, entryStringFormat);
-                    
-                    var itemRect = new Rectangle(x - 2, y + effectiveTitleHeight - scrollOffset - 2, 
-                        currentItemWidth + 4, currentIconSize + (int)textSize.Height + 5 + 4);
-
-                    if (itemRect.Contains(point))
-                    {
-                        return itemRect;
-                    }
-
-                    x += currentItemWidth + itemPadding;
-                    if (x + currentItemWidth > Width)
-                    {
-                        x = itemPadding;
-                        y += currentItemHeight + itemPadding;
-                    }
-                }
-            }
-
-            return Rectangle.Empty;
         }
     }
 

@@ -333,14 +333,36 @@ namespace NoFences.Model
                 return;
             }
 
+            FenceWindow window;
+            lock (_syncLock)
+            {
+                window = _openFences.Find(w => w.FenceId == fenceId);
+            }
+
+            if (window != null && !window.IsDisposed)
+            {
+                // The window owns its FenceInfo: mutate the file list on the UI thread only, so the
+                // painting code never enumerates it while a background service (e.g. the smart
+                // sorter) is adding to it.
+                try
+                {
+                    if (window.InvokeRequired)
+                        window.BeginInvoke(new Action(() => window.TryAddFile(filePath)));
+                    else
+                        window.TryAddFile(filePath);
+                    return;
+                }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            }
+
+            // No live window (should not happen): update the model and persist it directly
             lock (_syncLock)
             {
                 if (fence.Files.Contains(filePath)) return;
                 fence.Files.Add(filePath);
             }
-
             UpdateFence(fence);
-            ReloadFence(fenceId);
         }
 
         public void ReloadFence(Guid fenceId)
@@ -418,6 +440,7 @@ namespace NoFences.Model
                     {
                         try
                         {
+                            window.FlushPendingSave();
                             window.Close();
                             window.Dispose();
                         }
@@ -429,6 +452,10 @@ namespace NoFences.Model
                 }
                 _openFences.Clear();
             }
+
+            // Make sure debounced saves reach the disk before the process goes away
+            _persistenceService.Flush();
+            AppConfig.Flush();
         }
     }
 }

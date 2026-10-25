@@ -90,6 +90,13 @@ namespace NoFences
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
+                // Persist pending debounced saves when Windows logs off / shuts down
+                Microsoft.Win32.SystemEvents.SessionEnding += (s, e) =>
+                {
+                    try { DependencyInjection.GetRequiredService<IPersistenceService>().Flush(); } catch { }
+                    AppConfig.Flush();
+                };
+
                 // Configure dependency injection
                 DependencyInjection.ConfigureServices();
 
@@ -185,6 +192,8 @@ namespace NoFences
                 finally
                 {
                     loggingService.LogInfo("Universe shutting down");
+                    try { DependencyInjection.GetRequiredService<IPersistenceService>().Flush(); } catch { }
+                    AppConfig.Flush();
                     DependencyInjection.Dispose();
                 }
             }

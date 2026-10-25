@@ -108,11 +108,14 @@ namespace NoFences.Services
                 _loggingService.LogInfo("SmartSorter: Starting...");
                 _watcher = new FileSystemWatcher(_desktopPath)
                 {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    // Only creation/rename matter (no Changed handler), so skip LastWrite noise
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                    InternalBufferSize = 64 * 1024, // default 8 KB overflows when many files land at once
                     EnableRaisingEvents = true
                 };
                 _watcher.Created += OnFileCreated;
                 _watcher.Renamed += OnFileRenamed;
+                _watcher.Error += OnWatcherError;
             }
             catch (Exception ex)
             {
@@ -129,6 +132,7 @@ namespace NoFences.Services
                     _watcher.EnableRaisingEvents = false;
                     _watcher.Created -= OnFileCreated;
                     _watcher.Renamed -= OnFileRenamed;
+                    _watcher.Error -= OnWatcherError;
                     _watcher.Dispose();
                 }
                 catch { }
@@ -149,8 +153,32 @@ namespace NoFences.Services
             ProcessNewFile(e.FullPath, e.Name);
         }
 
+        private void OnWatcherError(object sender, ErrorEventArgs e)
+        {
+            // Typically an internal buffer overflow: restart the watcher instead of silently going deaf
+            _loggingService.LogWarning("SmartSorter: watcher error, restarting: " + e.GetException().Message);
+            Task.Run(() => Start());
+        }
+
+        // Created + Renamed (and repeated events) for the same path collapse into one run
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _inFlight =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+
+        private static bool IsTransientFile(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return true;
+            return fileName.StartsWith("~$", StringComparison.Ordinal)
+                || fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
+                || fileName.EndsWith(".crdownload", StringComparison.OrdinalIgnoreCase)
+                || fileName.EndsWith(".part", StringComparison.OrdinalIgnoreCase)
+                || fileName.EndsWith(".partial", StringComparison.OrdinalIgnoreCase);
+        }
+
         private void ProcessNewFile(string fullPath, string fileName)
         {
+            if (IsTransientFile(fileName)) return;
+            if (!_inFlight.TryAdd(fullPath, 0)) return;
+
             Task.Run(async () =>
             {
                 try
@@ -257,6 +285,10 @@ namespace NoFences.Services
                 catch (Exception ex)
                 {
                     _loggingService.LogError($"SmartSorter error: {ex.Message}");
+                }
+                finally
+                {
+                    _inFlight.TryRemove(fullPath, out _);
                 }
             });
         }
