@@ -2,7 +2,7 @@
 #define MyAppName "Universe"
 #define MyAppVersion "2.0.10"
 #define MyAppPublisher "Notbanzz"
-#define MyAppURL "https://universe-update-server.onrender.com"
+#define MyAppURL "https://universe-production-ad97.up.railway.app"
 #define MyAppExeName "Universe.exe"
 
 [Setup]

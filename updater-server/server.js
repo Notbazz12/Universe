@@ -2,8 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
-const http = require('http');
 
 const app = express();
 app.use(cors());
@@ -54,15 +52,5 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✦ Universe Website & Auto-Updater Server listening on port ${PORT}`);
-    
-    // Auto Keep-Alive Self Ping (cada 12 minutos)
-    const serverUrl = process.env.RENDER_EXTERNAL_URL || 'https://universe-update-server.onrender.com';
-    setInterval(() => {
-        const client = serverUrl.startsWith('https') ? https : http;
-        client.get(`${serverUrl}/health`, (res) => {
-            console.log(`[Keep-Alive] Ping sent to ${serverUrl}/health -> Status ${res.statusCode}`);
-        }).on('error', (err) => {
-            console.log(`[Keep-Alive] Ping error: ${err.message}`);
-        });
-    }, 12 * 60 * 1000); // 12 minutos
+    // Hosted on Railway: services stay awake, so no keep-alive self ping is needed
 });
