@@ -1,6 +1,6 @@
 {
-  "version": "2.0.9",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.9.exe",
-  "sha256": "59bda70e6528863197017a898f2833ace8ea8354020058c1e8e26124f306a1da",
-  "releaseNotes": "Universe v2.0.9: Specialized Images & Tasks fences with auto-import and file filtering, plus compact icon sizes (16px, 20px, 24px) with smooth Ctrl + Mouse Wheel zoom!"
+  "version": "2.0.10",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.10.exe",
+  "sha256": "e2920a417a64ec2b7f7c3ef82992effcf5d12d7d1d4e2e1a8b4a466df4e45dc5",
+  "releaseNotes": "Universe v2.0.10: las fences abren completas y conservan su tamano y posicion, vuelven a la pantalla si cambias de monitor o resolucion, se recuperan si Explorer se reinicia y el Smart Sorter ya no falla al crear fences."
 }
