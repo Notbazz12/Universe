@@ -49,6 +49,7 @@ namespace NoFences
 
                 // Unsubscribe from events
                 NoFences.Util.IconCache.Shared.Loaded -= IconCache_Loaded;
+                Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= SystemEvents_DisplaySettingsChanged;
             }
             base.Dispose(disposing);
         }

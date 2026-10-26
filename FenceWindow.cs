@@ -180,15 +180,55 @@ namespace NoFences
             AllowDrop = true;
 
             Text = fenceInfo.Name;
-            Location = new Point(fenceInfo.PosX, fenceInfo.PosY);
 
+            // Restoring the saved layout must not write it back (it would persist clamped values)
+            suppressBoundsSave = true;
+            Location = new Point(fenceInfo.PosX, fenceInfo.PosY);
             Width = fenceInfo.Width > 50 ? fenceInfo.Width : 300;
             Height = fenceInfo.Height > 50 ? fenceInfo.Height : 300;
-
             prevHeight = Height;
+            EnsureOnScreen();
+            suppressBoundsSave = false;
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += SystemEvents_DisplaySettingsChanged;
             InitializeSearchBox();
             UpdateCachedEntries();
             Minify();
+        }
+
+        // While true, bounds changes made by the app itself (screen clamping) are not persisted, so
+        // the saved layout survives a monitor being unplugged or a game changing the resolution.
+        private bool suppressBoundsSave;
+
+        /// <summary>
+        /// Pulls the fence back inside the working area of the nearest screen when the saved position
+        /// is off-screen (monitor removed, resolution or DPI changed). The saved position is kept.
+        /// </summary>
+        private void EnsureOnScreen()
+        {
+            var desired = new Rectangle(fenceInfo.PosX, fenceInfo.PosY, Width, isMinified ? titleHeight : Height);
+            var area = Screen.FromRectangle(desired).WorkingArea;
+
+            int x = Math.Max(area.Left, Math.Min(desired.X, area.Right - Math.Min(desired.Width, area.Width)));
+            int y = Math.Max(area.Top, Math.Min(desired.Y, area.Bottom - Math.Min(titleHeight, area.Height)));
+
+            bool wasSuppressed = suppressBoundsSave;
+            suppressBoundsSave = true;
+            try { Location = new Point(x, y); }
+            finally { suppressBoundsSave = wasSuppressed; }
+        }
+
+        private void SystemEvents_DisplaySettingsChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed) return;
+            BeginInvoke(new Action(() => { if (!IsDisposed) EnsureOnScreen(); }));
+        }
+
+        private void Expand()
+        {
+            if (!isMinified) return;
+            isMinified = false;
+            Height = prevHeight;
+            Invalidate();
         }
 
         public Guid FenceId => fenceInfo.Id;
@@ -307,6 +347,13 @@ namespace NoFences
             {
                 m.Result = IntPtr.Zero;
                 return;
+            }
+
+            // Explorer restarted (crash or update): the old Progman owner is gone, glue again
+            if (DesktopUtil.WM_TASKBARCREATED != 0 && m.Msg == DesktopUtil.WM_TASKBARCREATED)
+            {
+                DesktopUtil.GlueToDesktop(Handle);
+                EnsureOnScreen();
             }
 
             // Prevent foreground
@@ -606,6 +653,11 @@ namespace NoFences
         private void FenceWindow_Resize(object sender, EventArgs e)
         {
             if (fenceInfo == null) return;
+            if (suppressBoundsSave)
+            {
+                Invalidate();
+                return;
+            }
 
             debounceResize.Run(() =>
             {
@@ -751,11 +803,8 @@ namespace NoFences
                 this.Opacity = 1.0;
             }
 
-            if (minifyToolStripMenuItem != null && minifyToolStripMenuItem.Checked && isMinified)
-            {
-                isMinified = false;
-                Height = prevHeight;
-            }
+            if (minifyToolStripMenuItem != null && minifyToolStripMenuItem.Checked)
+                Expand();
             Invalidate();
         }
 
@@ -787,11 +836,7 @@ namespace NoFences
 
         private void minifyToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (isMinified)
-            {
-                Height = prevHeight;
-                isMinified = false;
-            }
+            Expand();
             fenceInfo.CanMinify = minifyToolStripMenuItem.Checked;
             Save();
         }
@@ -1193,7 +1238,7 @@ namespace NoFences
 
         private void FenceWindow_LocationChanged(object sender, EventArgs e)
         {
-            if (fenceInfo == null) return;
+            if (fenceInfo == null || suppressBoundsSave) return;
 
             debounceMove.Run(() =>
             {
@@ -1302,7 +1347,9 @@ namespace NoFences
                 minifyToolStripMenuItem.Checked = !minifyToolStripMenuItem.Checked;
                 fenceInfo.CanMinify = minifyToolStripMenuItem.Checked;
                 Save();
-                Minify();
+                // Turning roll-up off while rolled up used to leave the fence stuck as a title bar
+                if (minifyToolStripMenuItem.Checked) Minify();
+                else Expand();
             });
             minifyToolStripMenuItem.Checked = fenceInfo.CanMinify;
             appContextMenu.Items.Add(minifyToolStripMenuItem);

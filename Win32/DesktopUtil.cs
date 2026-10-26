@@ -16,6 +16,12 @@ namespace NoFences.Win32
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int RegisterWindowMessage(string lpString);
+
+        /// <summary>Broadcast by Windows to top-level windows when Explorer (re)starts.</summary>
+        public static readonly int WM_TASKBARCREATED = RegisterWindowMessage("TaskbarCreated");
+
         public static void PreventMinimize(IntPtr handle)
         {
             if (handle == IntPtr.Zero) return;

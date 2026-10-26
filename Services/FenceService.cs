@@ -52,9 +52,30 @@ namespace NoFences.Model
             _fenceCache = new Dictionary<Guid, FenceInfo>();
         }
 
+        // Bound to the UI thread in LoadFences (not in the constructor: creating a control before
+        // Application.SetUnhandledExceptionMode throws). Fences requested by background services
+        // (smart sorter, watchers) are created through it; a Form created on a worker thread fails
+        // with "DragDrop registration failed".
+        private Control _uiInvoker;
+
+        private bool NeedsUiThread => _uiInvoker != null && _uiInvoker.InvokeRequired;
+
+        private T RunOnUiThread<T>(Func<T> action)
+        {
+            if (NeedsUiThread)
+                return (T)_uiInvoker.Invoke(action);
+            return action();
+        }
+
         public void LoadFences()
         {
             _loggingService.LogInfo("Loading fences...");
+
+            if (_uiInvoker == null)
+            {
+                _uiInvoker = new Control();
+                _uiInvoker.CreateControl();
+            }
 
             var fences = _persistenceService.LoadAllFences();
 
@@ -92,6 +113,12 @@ namespace NoFences.Model
 
         public void CreateFence(string name, int posX = 100, int posY = 250, int width = 300, int height = 300)
         {
+            if (NeedsUiThread)
+            {
+                RunOnUiThread(() => { CreateFence(name, posX, posY, width, height); return true; });
+                return;
+            }
+
             var fenceInfo = new FenceInfo(Guid.NewGuid())
             {
                 Name = name,
@@ -100,7 +127,7 @@ namespace NoFences.Model
                 Width = width,
                 Height = height,
                 TitleHeight = 35,
-                CanMinify = true,
+                CanMinify = false, // open fully; roll-up is opt-in from the menu
                 Locked = false
             };
 
@@ -219,6 +246,9 @@ namespace NoFences.Model
 
         public FenceInfo CreateSpecializedFence(string name, string filterType, int posX, int posY, int width, int height, int iconSize, List<string> initialFiles = null)
         {
+            if (NeedsUiThread)
+                return RunOnUiThread(() => CreateSpecializedFence(name, filterType, posX, posY, width, height, iconSize, initialFiles));
+
             var fenceInfo = new FenceInfo(Guid.NewGuid())
             {
                 Name = name,
@@ -229,7 +259,7 @@ namespace NoFences.Model
                 Height = height,
                 IconSize = iconSize > 0 ? iconSize : 24,
                 TitleHeight = 35,
-                CanMinify = true,
+                CanMinify = false, // open fully; roll-up is opt-in from the menu
                 Locked = false,
                 ShowMascot = true,
                 Files = initialFiles != null ? new List<string>(initialFiles) : new List<string>()
