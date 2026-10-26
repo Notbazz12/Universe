@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using NoFences.Model;
 using NoFences.Util;
 using NoFences.Services;
+using static NoFences.Services.LocalizationManager;
 
 namespace NoFences.UI.Pages
 {
@@ -13,7 +14,7 @@ namespace NoFences.UI.Pages
         private FenceInfo fenceInfo;
         private Action onChanged;
 
-        private TrackBar hueTrack, satTrack, briTrack, alphaTrack;
+        private CyberSlider hueTrack, satTrack, briTrack, alphaTrack;
         private Panel previewPanel;
         private bool isUpdating;
         private CyberScrollPanel scrollHost;
@@ -45,22 +46,24 @@ namespace NoFences.UI.Pages
             // ── Heading ─────────────────────────────────────────────────────────
             Add(new Label
             {
-                Text      = "Personalization",
+                Text      = T("Personalization", "Personalización"),
                 Font      = new Font("Segoe UI", 18f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 34;
 
             Add(new Label
             {
-                Text      = "Fine-tune the Cyber-Glass aesthetic, iridescent glowing borders, and visual effects.",
+                Text      = T("Fine-tune the Cyber-Glass look, glowing borders and visual effects.", "Ajusta el estilo Cyber-Glass, los bordes luminosos y los efectos visuales."),
                 Font      = new Font("Segoe UI", 9.5f),
                 ForeColor = SettingsWindow.TxtMuted,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 38;
@@ -77,8 +80,8 @@ namespace NoFences.UI.Pages
             y += 94;
 
             // ── Preset Themes ────────────────────────────────────────────────────
-            var themeCard = CreateGlassCard("THEME PRESETS", ref y, 92);
-            themeCard.Controls.Add(CreateLabel("Select Theme", 20, 48));
+            var themeCard = CreateGlassCard(T("THEME PRESETS", "TEMAS"), ref y, 92);
+            themeCard.Controls.Add(CreateLabel(T("Select Theme", "Elegir tema"), 20, 48));
             var themeCombo = new CyberComboBox
             {
                 Location = new Point(140, 44),
@@ -132,15 +135,15 @@ namespace NoFences.UI.Pages
             themeCard.Controls.Add(themeCombo);
 
             // ── Cyber-Glass Effects ──────────────────────────────────────────────
-            var fxCard = CreateGlassCard("CYBER-GLASS & VISUAL EFFECTS", ref y, 225);
+            var fxCard = CreateGlassCard(T("CYBER-GLASS & VISUAL EFFECTS", "CYBER-GLASS Y EFECTOS VISUALES"), ref y, 240);
             int cy = 42;
-            CreateToggleRow(fxCard, "Iridescent Aura Border (luminous neon gradient glow)", ref cy, fenceInfo.EnableIridescentBorder,
+            CreateToggleRow(fxCard, T("Iridescent Aura Border (luminous neon gradient glow)", "Borde iridiscente (brillo neón degradado)"), ref cy, fenceInfo.EnableIridescentBorder,
                 on => { fenceInfo.EnableIridescentBorder = on; onChanged?.Invoke(); RefreshPreview(); });
-            CreateToggleRow(fxCard, "Item Count Pill Badge  [ N items ]", ref cy, fenceInfo.ShowItemCountBadge,
+            CreateToggleRow(fxCard, T("Item count badge", "Contador de elementos"), ref cy, fenceInfo.ShowItemCountBadge,
                 on => { fenceInfo.ShowItemCountBadge = on; onChanged?.Invoke(); RefreshPreview(); });
-            CreateToggleRow(fxCard, "Cosmic Mascot on Fences (reactive slime on title bar)", ref cy, fenceInfo.ShowMascot,
+            CreateToggleRow(fxCard, T("Cosmic Mascot on Fences (reactive slime on title bar)", "Mascota en las fences (slime en la barra de título)"), ref cy, fenceInfo.ShowMascot,
                 on => { fenceInfo.ShowMascot = on; onChanged?.Invoke(); RefreshPreview(); });
-            CreateToggleRow(fxCard, "Cosmic Desktop Pet (floating interactive companion)", ref cy, AppConfig.Load().ShowDesktopMascot,
+            CreateToggleRow(fxCard, T("Cosmic Desktop Pet (floating interactive companion)", "Mascota de escritorio (compañera flotante)"), ref cy, AppConfig.Load().ShowDesktopMascot,
                 on => {
                     var cfg = AppConfig.Load();
                     cfg.ShowDesktopMascot = on;
@@ -150,52 +153,53 @@ namespace NoFences.UI.Pages
                     else if (!on && DesktopMascotWindow.Instance != null && DesktopMascotWindow.Instance.Visible)
                         DesktopMascotWindow.ToggleVisibility();
                 });
-            CreateToggleRow(fxCard, "Breathing Pulse Animation (on file drop/addition)", ref cy, fenceInfo.EnableBreathingEffect,
+            CreateToggleRow(fxCard, T("Breathing Pulse Animation (on file drop/addition)", "Pulso al añadir archivos"), ref cy, fenceInfo.EnableBreathingEffect,
                 on => { fenceInfo.EnableBreathingEffect = on; onChanged?.Invoke(); });
 
             // ── Custom Color Tuning ──────────────────────────────────────────────
-            var colorCard = CreateGlassCard("CUSTOM COLOR & TRANSPARENCY TUNING", ref y, 226);
+            var colorCard = CreateGlassCard(T("CUSTOM COLOR & TRANSPARENCY", "COLOR Y TRANSPARENCIA"), ref y, 226);
             cy = 40;
-            hueTrack   = CreateSlider(colorCard, "Hue",          0, 360, ref cy);
-            satTrack   = CreateSlider(colorCard, "Saturation %", 0, 100, ref cy);
-            briTrack   = CreateSlider(colorCard, "Brightness %", 0, 100, ref cy);
-            alphaTrack = CreateSlider(colorCard, "Transparency", 0, 255, ref cy);
+            hueTrack   = CreateSlider(colorCard, T("Hue", "Tono"),          0, 360, ref cy);
+            hueTrack.RainbowTrack = true;
+            satTrack   = CreateSlider(colorCard, T("Saturation %", "Saturación %"), 0, 100, ref cy);
+            briTrack   = CreateSlider(colorCard, T("Brightness %", "Brillo %"), 0, 100, ref cy);
+            alphaTrack = CreateSlider(colorCard, T("Transparency", "Transparencia"), 0, 255, ref cy);
             LoadValues();
 
             // ── Header & Layout ───────────────────────────────────────────────────
-            var optCard = CreateGlassCard("HEADER & BEHAVIOR", ref y, 180);
+            var optCard = CreateGlassCard(T("HEADER & BEHAVIOR", "ENCABEZADO Y COMPORTAMIENTO"), ref y, 222);
             cy = 42;
-            CreateToggleRow(optCard, "Show Header Title Bar", ref cy, fenceInfo.ShowHeader,
+            CreateToggleRow(optCard, T("Show Header Title Bar", "Mostrar barra de título"), ref cy, fenceInfo.ShowHeader,
                 on => { fenceInfo.ShowHeader = on; onChanged?.Invoke(); RefreshPreview(); });
-            CreateToggleRow(optCard, "Chameleon Mode (fade out when mouse is away)", ref cy, fenceInfo.ChameleonMode,
+            CreateToggleRow(optCard, T("Chameleon Mode (fade out when mouse is away)", "Modo camaleón (se desvanece sin el ratón encima)"), ref cy, fenceInfo.ChameleonMode,
                 on => { fenceInfo.ChameleonMode = on; onChanged?.Invoke(); });
-            CreateToggleRow(optCard, "Magic Color (infer accent from contained file types)", ref cy, fenceInfo.EnableMagicColor,
+            CreateToggleRow(optCard, T("Magic Color (infer accent from contained file types)", "Color mágico (según el tipo de archivos)"), ref cy, fenceInfo.EnableMagicColor,
                 on => { fenceInfo.EnableMagicColor = on; onChanged?.Invoke(); });
 
-            optCard.Controls.Add(CreateLabel("Title Align", 20, cy + 4));
+            optCard.Controls.Add(CreateLabel(T("Title Align", "Alinear título"), 20, cy + 4));
             var alignCombo = new CyberComboBox
             {
                 Location = new Point(140, cy),
                 Width    = 160
             };
-            alignCombo.Items.AddRange(new object[] { "Left", "Center", "Right" });
+            alignCombo.Items.AddRange(new object[] { T("Left", "Izquierda"), T("Center", "Centro"), T("Right", "Derecha") });
             alignCombo.SelectedIndex = fenceInfo.TitleAlignment;
             alignCombo.SelectedIndexChanged += (s, e) => { fenceInfo.TitleAlignment = alignCombo.SelectedIndex; onChanged?.Invoke(); RefreshPreview(); };
             optCard.Controls.Add(alignCombo);
 
             // ── Fonts & Icons ─────────────────────────────────────────────────────
-            var fontCard = CreateGlassCard("TYPOGRAPHY & ICONS", ref y, 126);
+            var fontCard = CreateGlassCard(T("TYPOGRAPHY & ICONS", "TIPOGRAFÍA E ICONOS"), ref y, 126);
             cy = 42;
 
-            var btnTF = CreateCyberButton("Title Font…", SettingsWindow.AccentNeon, new Point(20, cy), 130);
+            var btnTF = CreateCyberButton(T("Title Font…", "Fuente título…"), SettingsWindow.AccentNeon, new Point(20, cy), 130);
             btnTF.Click += (s, e) => ChangeFont(true);
             fontCard.Controls.Add(btnTF);
 
-            var btnIF = CreateCyberButton("Item Font…", SettingsWindow.AccentVio, new Point(160, cy), 130);
+            var btnIF = CreateCyberButton(T("Item Font…", "Fuente ítems…"), SettingsWindow.AccentVio, new Point(160, cy), 130);
             btnIF.Click += (s, e) => ChangeFont(false);
             fontCard.Controls.Add(btnIF);
 
-            fontCard.Controls.Add(CreateLabel("Icon Size", 310, cy + 5));
+            fontCard.Controls.Add(CreateLabel(T("Icon Size", "Tamaño"), 310, cy + 5));
             var iconCombo = new CyberComboBox
             {
                 Location = new Point(390, cy),
@@ -333,7 +337,7 @@ namespace NoFences.UI.Pages
             return card;
         }
 
-        private TrackBar CreateSlider(Panel parent, string label, int min, int max, ref int cy)
+        private CyberSlider CreateSlider(Panel parent, string label, int min, int max, ref int cy)
         {
             parent.Controls.Add(new Label
             {
@@ -344,14 +348,12 @@ namespace NoFences.UI.Pages
                 BackColor = Color.Transparent,
                 Font      = new Font("Segoe UI", 9f)
             });
-            var tb = new TrackBar
+            var tb = new CyberSlider
             {
-                Location  = new Point(140, cy),
-                Size      = new Size(400, 36),
-                Minimum   = min,
-                Maximum   = max,
-                TickStyle = TickStyle.None,
-                BackColor = SettingsWindow.BgCard
+                Location  = new Point(140, cy + 4),
+                Size      = new Size(400, 28),
+                                Minimum   = min,
+                Maximum   = max
             };
             tb.ValueChanged += (s, e) => { UpdateColor(); RefreshPreview(); };
             parent.Controls.Add(tb);
@@ -367,6 +369,7 @@ namespace NoFences.UI.Pages
                 Text      = label,
                 Location  = new Point(76, cy + 3),
                 AutoSize  = true,
+                UseMnemonic = false,
                 ForeColor = init ? SettingsWindow.TxtHigh : SettingsWindow.TxtMid,
                 BackColor = Color.Transparent,
                 Font      = new Font("Segoe UI", 9.5f)
@@ -394,6 +397,7 @@ namespace NoFences.UI.Pages
                 Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
                 Cursor    = Cursors.Hand
             };
+            b.Width = Math.Max(b.Width, TextRenderer.MeasureText(text, b.Font).Width + 32); // fit translated text
             b.FlatAppearance.BorderColor        = accent;
             b.FlatAppearance.BorderSize         = 1;
             b.FlatAppearance.MouseOverBackColor = Color.FromArgb(
@@ -408,6 +412,7 @@ namespace NoFences.UI.Pages
             Text      = text,
             Location  = new Point(x, y),
             AutoSize  = true,
+            UseMnemonic = false,
             ForeColor = SettingsWindow.TxtMid,
             BackColor = Color.Transparent,
             Font      = new Font("Segoe UI", 9.5f)

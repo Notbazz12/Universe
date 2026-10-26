@@ -21,6 +21,7 @@ namespace NoFences.UI
 
         private const int WM_MOUSEWHEEL = 0x020A;
         private const int SCROLLBAR_TRACK_WIDTH = 16;
+        private const int RightGutter = 16;
 
         public CyberScrollPanel()
         {
@@ -95,6 +96,11 @@ namespace NoFences.UI
 
             foreach (Control c in _content.Controls)
             {
+                // Cards anchored right are sized explicitly: WinForms anchoring stretched them
+                // from their initial width and pushed their right edge under the scrollbar.
+                if ((c.Anchor & AnchorStyles.Right) != 0 && (c.Anchor & AnchorStyles.Left) != 0)
+                    c.Width = Math.Max(200, availableContentWidth - c.Left - RightGutter);
+
                 if (c.Visible)
                 {
                     int bottom = c.Location.Y + c.Height + c.Margin.Bottom;

@@ -1,6 +1,6 @@
 {
-  "version": "2.0.10",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.10.exe",
-  "sha256": "e2920a417a64ec2b7f7c3ef82992effcf5d12d7d1d4e2e1a8b4a466df4e45dc5",
-  "releaseNotes": "Universe v2.0.10: las fences abren completas y conservan su tamano y posicion, vuelven a la pantalla si cambias de monitor o resolucion, se recuperan si Explorer se reinicia y el Smart Sorter ya no falla al crear fences."
+  "version": "2.0.11",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.11.exe",
+  "sha256": "64458733b2f4f9194921f4d2627e451a5cb966802e78ffac1b8042ebd520cc72",
+  "releaseNotes": "Universe v2.0.11: ventana de Ajustes renovada y traducida al espanol, iconos corregidos, deslizadores de color nuevos y cambio de idioma al instante."
 }

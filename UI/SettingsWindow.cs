@@ -1,10 +1,12 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using NoFences.Model;
 using NoFences.Services;
+using static NoFences.Services.LocalizationManager;
 using NoFences.Win32;
 
 namespace NoFences.UI
@@ -59,7 +61,7 @@ namespace NoFences.UI
 
         private void Build()
         {
-            Text            = "Universe · Settings";
+            Text            = T("Universe · Settings", "Universe · Ajustes");
             Size            = new Size(880, 620);
             MinimumSize     = new Size(780, 520);
             BackColor       = BgMain;
@@ -83,9 +85,10 @@ namespace NoFences.UI
 
             // Nav items
             int navY = 96;
-            var navGen = MakeNav("⚡  General",         ref navY);
-            var navPer = MakeNav("🎨  Personalization", ref navY);
-            var navAbt = MakeNav("ℹ️  About",           ref navY);
+            // Icons are Segoe MDL2 Assets glyphs: color emoji render as empty boxes in GDI+
+            var navGen = MakeNav("", "General",                                ref navY);
+            var navPer = MakeNav("", T("Personalization", "Personalización"),  ref navY);
+            var navAbt = MakeNav("", T("About", "Acerca de"),                  ref navY);
 
             navGen.Click += (s, e) => { Activate(navGen); LoadGeneral(); };
             navPer.Click += (s, e) => { Activate(navPer); LoadPersonalization(); };
@@ -104,7 +107,7 @@ namespace NoFences.UI
                 BackColor = Color.FromArgb(24, 28, 44),
                 ForeColor = AccentNeon,
                 Font      = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                Text      = "⟳  Check Updates",
+                Text      = T("Check Updates", "Buscar actualizaciones"),
                 Cursor    = Cursors.Hand
             };
             btnUpdateSidebar.FlatAppearance.BorderColor        = Color.FromArgb(48, 56, 85);
@@ -112,9 +115,9 @@ namespace NoFences.UI
             btnUpdateSidebar.FlatAppearance.MouseOverBackColor = Color.FromArgb(35, 42, 68);
             btnUpdateSidebar.Click += (s, e) =>
             {
-                btnUpdateSidebar.Text = "Checking...";
+                btnUpdateSidebar.Text = T("Checking...", "Buscando...");
                 NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>().CheckForUpdates(false);
-                btnUpdateSidebar.Text = "⟳  Check Updates";
+                btnUpdateSidebar.Text = T("Check Updates", "Buscar actualizaciones");
             };
             sidebar.Controls.Add(btnUpdateSidebar);
 
@@ -149,7 +152,7 @@ namespace NoFences.UI
             using (var subFont = new Font("Segoe UI", 8f))
             using (var b = new SolidBrush(TxtMuted))
             {
-                g.DrawString("Desktop Workspace Engine", subFont, b, 20, 50);
+                g.DrawString(T("Desktop Workspace Engine", "Organizador de escritorio"), subFont, b, 20, 50);
             }
 
             // Subtle Glass Divider
@@ -165,9 +168,22 @@ namespace NoFences.UI
             }
         }
 
-        private NavItem MakeNav(string text, ref int y)
+        /// <summary>Redraws the whole window, e.g. after the interface language changed.</summary>
+        public void Rebuild()
         {
-            var item = new NavItem(text)
+            var size = Size;
+            SuspendLayout();
+            foreach (Control c in Controls.Cast<Control>().ToArray())
+                c.Dispose();
+            Controls.Clear();
+            Build();
+            Size = size;
+            ResumeLayout(true);
+        }
+
+        private NavItem MakeNav(string icon, string text, ref int y)
+        {
+            var item = new NavItem(icon, text)
             {
                 Location = new Point(12, y),
                 Size     = new Size(196, 44)
@@ -219,9 +235,13 @@ namespace NoFences.UI
         public bool IsActive;
         private bool _hover;
         private readonly string _text;
+        private readonly string _icon;
 
-        public NavItem(string text)
+        private static readonly Font IconFont = new Font("Segoe MDL2 Assets", 11f);
+
+        public NavItem(string icon, string text)
         {
+            _icon     = icon;
             SetStyle(ControlStyles.SupportsTransparentBackColor |
                      ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.AllPaintingInWmPaint  |
@@ -280,9 +300,11 @@ namespace NoFences.UI
 
             using (var f = new Font("Segoe UI", 9.5f, IsActive ? FontStyle.Bold : FontStyle.Regular))
             using (var b = new SolidBrush(textColor))
+            using (var iconBrush = new SolidBrush(IsActive ? SettingsWindow.AccentNeon : textColor))
+            using (var sf = new StringFormat { LineAlignment = StringAlignment.Center })
             {
-                var sf = new StringFormat { LineAlignment = StringAlignment.Center };
-                g.DrawString(_text, f, b, new RectangleF(16, 0, Width - 20, Height), sf);
+                g.DrawString(_icon, IconFont, iconBrush, new RectangleF(16, 1, 24, Height), sf);
+                g.DrawString(_text, f, b, new RectangleF(44, 0, Width - 48, Height), sf);
             }
         }
 

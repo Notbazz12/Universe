@@ -55,6 +55,12 @@ namespace NoFences.Services
             { "LaptopMode", new Dictionary<Language, string> { { Language.English, "Laptop Mode (Save Battery)" }, { Language.Spanish, "Modo Portátil (Ahorro Batería)" } } }
         };
 
+        /// <summary>Picks the inline translation for the current language.</summary>
+        public static string T(string en, string es)
+        {
+            return CurrentLanguage == Language.Spanish ? es : en;
+        }
+
         public static string GetString(string key)
         {
             if (Resources.ContainsKey(key))

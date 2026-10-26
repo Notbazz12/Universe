@@ -8,6 +8,7 @@ using System.Linq;
 using Microsoft.Win32;
 using NoFences.Model;
 using NoFences.Services;
+using static NoFences.Services.LocalizationManager;
 
 namespace NoFences.UI.Pages
 {
@@ -44,32 +45,34 @@ namespace NoFences.UI.Pages
             // ── Heading ─────────────────────────────────────────────────────────
             Add(new Label
             {
-                Text      = "General Settings",
+                Text      = T("General Settings", "Ajustes generales"),
                 Font      = new Font("Segoe UI", 18f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 34;
 
             Add(new Label
             {
-                Text      = "Configure system behavior, workspace preferences, and automatic sorting.",
+                Text      = T("Configure system behavior, workspace preferences, and automatic sorting.", "Configura el comportamiento del sistema, el espacio de trabajo y el orden automático."),
                 Font      = new Font("Segoe UI", 9.5f),
                 ForeColor = SettingsWindow.TxtMuted,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 40;
 
             // ── System Preferences Card ──────────────────────────────────────────
-            var sysCard = CreateGlassCard("SYSTEM PREFERENCES", ref y, 280);
+            var sysCard = CreateGlassCard(T("SYSTEM PREFERENCES", "PREFERENCIAS DEL SISTEMA"), ref y, 262);
             int cy = 42;
 
             // Language selector
-            sysCard.Controls.Add(CreateLabel("Interface Language", 20, cy + 3));
+            sysCard.Controls.Add(CreateLabel(T("Interface Language", "Idioma de la interfaz"), 20, cy + 3));
             var comboLang = new CyberComboBox
             {
                 Location = new Point(180, cy),
@@ -85,13 +88,15 @@ namespace NoFences.UI.Pages
                 config.Save();
                 LocalizationManager.CurrentLanguage = lang == "Spanish"
                     ? LocalizationManager.Language.Spanish : LocalizationManager.Language.English;
-                Info(lang == "Spanish" ? "Reinicie Universe para aplicar el cambio." : "Restart Universe to apply the language change.");
+                // Redraw the settings window in the new language right away; fence and tray
+                // menus are built at startup and pick it up after a restart.
+                BeginInvoke(new Action(() => (FindForm() as SettingsWindow)?.Rebuild()));
             };
             sysCard.Controls.Add(comboLang);
             cy += 48;
 
-            CreateToggleRow(sysCard, "Start Universe with Windows", IsStartupEnabled(), ref cy, on => SetStartup(on));
-            CreateToggleRow(sysCard, "Check for updates automatically on startup", config.AutoCheckUpdates, ref cy, on => 
+            CreateToggleRow(sysCard, T("Start Universe with Windows", "Iniciar Universe con Windows"), IsStartupEnabled(), ref cy, on => SetStartup(on));
+            CreateToggleRow(sysCard, T("Check for updates automatically on startup", "Buscar actualizaciones automáticamente al iniciar"), config.AutoCheckUpdates, ref cy, on => 
             { 
                 config.AutoCheckUpdates = on; 
                 config.Save(); 
@@ -99,29 +104,30 @@ namespace NoFences.UI.Pages
                 if (on) updateSvc?.StartBackgroundCheck();
                 else updateSvc?.StopBackgroundCheck();
             });
-            CreateToggleRow(sysCard, "Laptop Mode (disables blur to maximize battery)", config.LaptopMode, ref cy,
-                on => { config.LaptopMode = on; config.Save(); Info("Restart to apply Laptop Mode."); });
-            CreateToggleRow(sysCard, "Smooth Hardware Animations", config.EnableAnimations, ref cy,
+            CreateToggleRow(sysCard, T("Laptop Mode (disables blur to maximize battery)", "Modo portátil (desactiva el desenfoque para ahorrar batería)"), config.LaptopMode, ref cy,
+                on => { config.LaptopMode = on; config.Save(); Info(T("Restart to apply Laptop Mode.", "Reinicia Universe para aplicar el modo portátil.")); });
+            CreateToggleRow(sysCard, T("Smooth Hardware Animations", "Animaciones suaves"), config.EnableAnimations, ref cy,
                 on => { config.EnableAnimations = on; config.Save(); });
 
             // ── Workspace Features Card ──────────────────────────────────────────
-            var featCard = CreateGlassCard("WORKSPACE FEATURES", ref y, 136);
+            var featCard = CreateGlassCard(T("WORKSPACE FEATURES", "FUNCIONES DEL ESPACIO DE TRABAJO"), ref y, 136);
             cy = 42;
-            CreateToggleRow(featCard, "Smart Sorter (auto-organize files by rules and types)", config.EnableSmartSorter, ref cy,
-                on => { config.EnableSmartSorter = on; config.Save(); Info("Smart Sorter " + (on ? "enabled" : "disabled") + ". Restart to apply."); });
-            CreateToggleRow(featCard, "Desktop Notifications & File Activity Alerts", config.ShowNotifications, ref cy,
+            CreateToggleRow(featCard, T("Smart Sorter (auto-organize files by rules and types)", "Smart Sorter (organiza archivos automáticamente por reglas y tipos)"), config.EnableSmartSorter, ref cy,
+                on => { config.EnableSmartSorter = on; config.Save(); Info(on ? T("Smart Sorter enabled. Restart to apply.", "Smart Sorter activado. Reinicia para aplicarlo.") : T("Smart Sorter disabled. Restart to apply.", "Smart Sorter desactivado. Reinicia para aplicarlo.")); });
+            CreateToggleRow(featCard, T("Desktop Notifications & File Activity Alerts", "Notificaciones de escritorio y avisos de actividad"), config.ShowNotifications, ref cy,
                 on => { config.ShowNotifications = on; config.Save(); });
 
             // ── Workspace Management Card ────────────────────────────────────────
-            var fenceCard = CreateGlassCard("WORKSPACE & FENCE MANAGEMENT", ref y, 220);
+            var fenceCard = CreateGlassCard(T("WORKSPACE & FENCE MANAGEMENT", "GESTIÓN DE FENCES"), ref y, 214);
             cy = 42;
 
             var svc = NoFences.Core.DependencyInjection.GetRequiredService<IFenceService>();
             var lblCount = new Label
             {
-                Text      = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)",
+                Text      = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)"),
                 Location  = new Point(20, cy),
                 AutoSize  = true,
+                UseMnemonic = false,
                 ForeColor = SettingsWindow.AccentNeon,
                 BackColor = Color.Transparent,
                 Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold)
@@ -129,126 +135,138 @@ namespace NoFences.UI.Pages
             fenceCard.Controls.Add(lblCount);
             cy += 32;
 
-            var btnNew = CreateCyberButton("＋  New Fence", SettingsWindow.AccentNeon, new Point(20, cy), 120);
-            btnNew.Click += (s, e) => { svc.CreateFence("New Fence"); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            var btnNew = CreateCyberButton(T("＋  New Fence", "＋  Nueva fence"), SettingsWindow.AccentNeon, new Point(20, cy), 120);
+            btnNew.Click += (s, e) => { svc.CreateFence("New Fence"); lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)"); };
             fenceCard.Controls.Add(btnNew);
 
-            var btnNewImg = CreateCyberButton("🖼  Images Fence", SettingsWindow.AccentVio, new Point(150, cy), 130);
-            btnNewImg.Click += (s, e) => { svc.CreateImageFence(); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            var btnNewImg = CreateCyberButton(T("Images Fence", "Fence de imágenes"), SettingsWindow.AccentVio, new Point(150, cy), 130);
+            btnNewImg.Click += (s, e) => { svc.CreateImageFence(); lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)"); };
             fenceCard.Controls.Add(btnNewImg);
 
-            var btnNewTask = CreateCyberButton("📝  Tasks Fence", Color.FromArgb(70, 200, 255), new Point(290, cy), 130);
-            btnNewTask.Click += (s, e) => { svc.CreateTaskFence(); lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)"; };
+            var btnNewTask = CreateCyberButton(T("Tasks Fence", "Fence de tareas"), Color.FromArgb(70, 200, 255), new Point(290, cy), 130);
+            btnNewTask.Click += (s, e) => { svc.CreateTaskFence(); lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)"); };
             fenceCard.Controls.Add(btnNewTask);
 
-            var btnDel = CreateCyberButton("🗑  Delete All", SettingsWindow.AccentPink, new Point(430, cy), 120);
+            var btnDel = CreateCyberButton(T("Delete All", "Borrar todas"), SettingsWindow.AccentPink, new Point(430, cy), 120);
             btnDel.Click += (s, e) =>
             {
                 var all = svc.GetAllFences();
-                if (all.Count == 0) { Info("No fences to delete."); return; }
-                if (MessageBox.Show($"Delete ALL {all.Count} fence(s)? This will remove the fence containers but keep your desktop files.",
-                    "Confirm Reset", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                if (all.Count == 0) { Info(T("No fences to delete.", "No hay fences para borrar.")); return; }
+                if (MessageBox.Show(T($"Delete ALL {all.Count} fence(s)? This will remove the fence containers but keep your desktop files.", $"¿Borrar TODAS las fences ({all.Count})? Se quitan los contenedores, pero tus archivos del escritorio se conservan."),
+                    T("Confirm Reset", "Confirmar"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 foreach (var f in all.ToArray()) svc.RemoveFence(f);
-                lblCount.Text = "⚡  0 active fence workspace(s)";
+                lblCount.Text = T("⚡  0 active fences", "⚡  0 fences activas");
             };
             fenceCard.Controls.Add(btnDel);
+            FlowRow(btnNew, btnNewImg, btnNewTask);
 
             cy += 42;
 
-            var btnGames = CreateCyberButton("🎮  Organize Games", SettingsWindow.AccentVio, new Point(20, cy), 160);
+            var btnGames = CreateCyberButton(T("Organize Games", "Ordenar juegos"), SettingsWindow.AccentVio, new Point(20, cy), 160);
             btnGames.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
                 if (sorter != null)
                 {
                     int count = sorter.SortDesktopGames();
-                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)");
                     Info(count > 0 
-                        ? $"Successfully organized {count} games into your Games Fence!" 
-                        : "No new desktop games detected.");
+                        ? T($"Organized {count} games into your Games fence.", $"Se ordenaron {count} juegos en la fence de juegos.") 
+                        : T("No new desktop games detected.", "No se detectaron juegos nuevos en el escritorio."));
                 }
             };
             fenceCard.Controls.Add(btnGames);
 
-            var btnProgs = CreateCyberButton("⚡  Organize Programs", SettingsWindow.AccentNeon, new Point(190, cy), 170);
+            var btnProgs = CreateCyberButton(T("Organize Programs", "Ordenar programas"), SettingsWindow.AccentNeon, new Point(190, cy), 170);
             btnProgs.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
                 if (sorter != null)
                 {
                     int count = sorter.SortDesktopPrograms();
-                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)");
                     Info(count > 0 
-                        ? $"Successfully organized {count} programs into your Programs Fence!" 
-                        : "No new desktop programs detected.");
+                        ? T($"Organized {count} programs into your Programs fence.", $"Se ordenaron {count} programas en la fence de programas.") 
+                        : T("No new desktop programs detected.", "No se detectaron programas nuevos en el escritorio."));
                 }
             };
             fenceCard.Controls.Add(btnProgs);
 
-            var btnAll = CreateCyberButton("🪄  Organize All", Color.FromArgb(160, 140, 255), new Point(370, cy), 140);
+            var btnAll = CreateCyberButton(T("Organize All", "Ordenar todo"), Color.FromArgb(160, 140, 255), new Point(370, cy), 140);
             btnAll.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
                 if (sorter != null)
                 {
                     var (gCount, pCount) = sorter.SortAllDesktop();
-                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
-                    Info($"Desktop Organized!\n• Games: {gCount}\n• Programs: {pCount}");
+                    lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)");
+                    Info(T($"Desktop organized.\n• Games: {gCount}\n• Programs: {pCount}", $"Escritorio ordenado.\n• Juegos: {gCount}\n• Programas: {pCount}"));
                 }
             };
             fenceCard.Controls.Add(btnAll);
+            FlowRow(btnGames, btnProgs, btnAll);
 
             cy += 42;
 
-            var btnImgs = CreateCyberButton("🖼  Organize Images", SettingsWindow.AccentVio, new Point(20, cy), 160);
+            var btnImgs = CreateCyberButton(T("Organize Images", "Ordenar imágenes"), SettingsWindow.AccentVio, new Point(20, cy), 160);
             btnImgs.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
                 if (sorter != null)
                 {
                     int count = sorter.SortDesktopImages();
-                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)");
                     Info(count > 0 
-                        ? $"Successfully organized {count} images into your Images Fence!" 
-                        : "No new desktop images detected.");
+                        ? T($"Organized {count} images into your Images fence.", $"Se ordenaron {count} imágenes en la fence de imágenes.") 
+                        : T("No new desktop images detected.", "No se detectaron imágenes nuevas en el escritorio."));
                 }
             };
             fenceCard.Controls.Add(btnImgs);
 
-            var btnTasks = CreateCyberButton("📝  Organize Tasks", Color.FromArgb(70, 200, 255), new Point(190, cy), 170);
+            var btnTasks = CreateCyberButton(T("Organize Tasks", "Ordenar tareas"), Color.FromArgb(70, 200, 255), new Point(190, cy), 170);
             btnTasks.Click += (s, e) =>
             {
                 var sorter = NoFences.Core.DependencyInjection.GetService<ISmartSorterService>();
                 if (sorter != null)
                 {
                     int count = sorter.SortDesktopTasks();
-                    lblCount.Text = $"⚡  {svc.GetAllFences().Count} active fence workspace(s)";
+                    lblCount.Text = T($"⚡  {svc.GetAllFences().Count} active fence(s)", $"⚡  {svc.GetAllFences().Count} fence(s) activa(s)");
                     Info(count > 0 
-                        ? $"Successfully organized {count} tasks/notes into your Tasks Fence!" 
-                        : "No new desktop tasks detected.");
+                        ? T($"Organized {count} tasks/notes into your Tasks fence.", $"Se ordenaron {count} tareas/notas en la fence de tareas.") 
+                        : T("No new desktop tasks detected.", "No se detectaron tareas nuevas en el escritorio."));
                 }
             };
             fenceCard.Controls.Add(btnTasks);
+            btnDel.Top = btnImgs.Top; // destructive action sits apart, at the end of the last row
+            FlowRow(btnImgs, btnTasks, btnDel);
 
             // ── Application Maintenance Card ─────────────────────────────────────
-            var appCard = CreateGlassCard("MAINTENANCE & UPDATES", ref y, 140);
+            var appCard = CreateGlassCard(T("MAINTENANCE & UPDATES", "MANTENIMIENTO Y ACTUALIZACIONES"), ref y, 100);
             cy = 42;
 
-            var btnUpd = CreateCyberButton("⟳  Check Updates", SettingsWindow.AccentVio, new Point(20, cy), 140);
+            var btnUpd = CreateCyberButton(T("Check Updates", "Buscar actualizaciones"), SettingsWindow.AccentVio, new Point(20, cy), 140);
             btnUpd.Click += (s, e) =>
                 NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>().CheckForUpdates(false);
             appCard.Controls.Add(btnUpd);
 
-            var btnData = CreateCyberButton("📁  Data Folder", Color.FromArgb(70, 85, 120), new Point(170, cy), 130);
+            var btnData = CreateCyberButton(T("Data Folder", "Carpeta de datos"), Color.FromArgb(70, 85, 120), new Point(170, cy), 130);
             btnData.Click += (s, e) => Process.Start("explorer.exe",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NoFences"));
             appCard.Controls.Add(btnData);
 
-            var btnRestart = CreateCyberButton("↺  Restart App", Color.FromArgb(70, 85, 120), new Point(310, cy), 130);
+            var btnRestart = CreateCyberButton(T("Restart App", "Reiniciar app"), Color.FromArgb(70, 85, 120), new Point(310, cy), 130);
             btnRestart.Click += (s, e) => { Application.Restart(); Environment.Exit(0); };
             appCard.Controls.Add(btnRestart);
+            FlowRow(btnUpd, btnData, btnRestart);
 
             scrollHost.UpdateLayout();
+        }
+
+        /// <summary>Places buttons left to right with even gaps after they sized to their text.</summary>
+        private static void FlowRow(params Control[] row)
+        {
+            for (int i = 1; i < row.Length; i++)
+                row[i].Left = row[i - 1].Right + 10;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -327,6 +345,7 @@ namespace NoFences.UI.Pages
                 Text      = label,
                 Location  = new Point(76, cy + 3),
                 AutoSize  = true,
+                UseMnemonic = false,
                 ForeColor = initial ? SettingsWindow.TxtHigh : SettingsWindow.TxtMid,
                 BackColor = Color.Transparent,
                 Font      = new Font("Segoe UI", 9.5f)
@@ -346,6 +365,7 @@ namespace NoFences.UI.Pages
             Text      = text,
             Location  = new Point(x, y),
             AutoSize  = true,
+            UseMnemonic = false,
             ForeColor = SettingsWindow.TxtMid,
             BackColor = Color.Transparent,
             Font      = new Font("Segoe UI", 9.5f)
@@ -364,6 +384,7 @@ namespace NoFences.UI.Pages
                 Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
                 Cursor    = Cursors.Hand
             };
+            b.Width = Math.Max(b.Width, TextRenderer.MeasureText(text, b.Font).Width + 32); // fit translated text
             b.FlatAppearance.BorderColor        = accent;
             b.FlatAppearance.BorderSize         = 1;
             b.FlatAppearance.MouseOverBackColor = Color.FromArgb(

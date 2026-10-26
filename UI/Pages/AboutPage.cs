@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using NoFences.Services;
+using static NoFences.Services.LocalizationManager;
 
 namespace NoFences.UI.Pages
 {
@@ -36,28 +37,30 @@ namespace NoFences.UI.Pages
             // ── Heading ─────────────────────────────────────────────────────────
             Add(new Label
             {
-                Text      = "About Universe",
+                Text      = T("About Universe", "Acerca de Universe"),
                 Font      = new Font("Segoe UI", 18f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 34;
 
             Add(new Label
             {
-                Text      = "High-performance, GPU-accelerated desktop organization engine for Windows.",
+                Text      = T("Fast desktop organizer for Windows.", "Organizador de escritorio rápido para Windows."),
                 Font      = new Font("Segoe UI", 9.5f),
                 ForeColor = SettingsWindow.TxtMuted,
                 BackColor = Color.Transparent,
                 AutoSize  = true,
+                UseMnemonic = false,
                 Location  = new Point(32, y)
             });
             y += 40;
 
             // ── App Info Card ───────────────────────────────────────────────────
-            var appCard = CreateGlassCard("APPLICATION INFORMATION", ref y, 160);
+            var appCard = CreateGlassCard(T("APPLICATION INFORMATION", "INFORMACIÓN DE LA APLICACIÓN"), ref y, 160);
             int cy = 42;
 
             appCard.Controls.Add(new Label
@@ -65,6 +68,7 @@ namespace NoFences.UI.Pages
                 Text      = "✦  Universe Desktop Organizer",
                 Location  = new Point(20, cy),
                 AutoSize  = true,
+                UseMnemonic = false,
                 Font      = new Font("Segoe UI", 13f, FontStyle.Bold),
                 ForeColor = SettingsWindow.AccentNeon,
                 BackColor = Color.Transparent
@@ -73,9 +77,10 @@ namespace NoFences.UI.Pages
 
             appCard.Controls.Add(new Label
             {
-                Text      = $"Version {UpdateService.CurrentVersion} (Cyber-Glass & Iridescent Bubble Edition)",
+                Text      = T($"Version {UpdateService.CurrentVersion}", $"Versión {UpdateService.CurrentVersion}"),
                 Location  = new Point(20, cy),
                 AutoSize  = true,
+                UseMnemonic = false,
                 Font      = new Font("Segoe UI", 9.5f),
                 ForeColor = SettingsWindow.TxtHigh,
                 BackColor = Color.Transparent
@@ -84,9 +89,10 @@ namespace NoFences.UI.Pages
 
             appCard.Controls.Add(new Label
             {
-                Text      = "Created by Notbanzz & Open Source Community",
+                Text      = T("Created by Notbanzz & the open source community", "Creado por Notbanzz y la comunidad open source"),
                 Location  = new Point(20, cy),
                 AutoSize  = true,
+                UseMnemonic = false,
                 Font      = new Font("Segoe UI", 9f),
                 ForeColor = SettingsWindow.TxtMuted,
                 BackColor = Color.Transparent
@@ -109,14 +115,15 @@ namespace NoFences.UI.Pages
             appCard.Controls.Add(picMascot);
 
             // ── Links & Updates Card ────────────────────────────────────────────
-            var linkCard = CreateGlassCard("COMMUNITY & UPDATES", ref y, 140);
+            var linkCard = CreateGlassCard(T("COMMUNITY & UPDATES", "COMUNIDAD Y ACTUALIZACIONES"), ref y, 140);
             cy = 42;
 
             var linkGithub = new LinkLabel
             {
-                Text             = "🌐  Visit GitHub Repository (Notbazz12/Universe)",
+                Text             = T("Visit GitHub repository (Notbazz12/Universe)", "Ver repositorio en GitHub (Notbazz12/Universe)"),
                 Location         = new Point(20, cy),
                 AutoSize         = true,
+                UseMnemonic = false,
                 Font             = new Font("Segoe UI", 10f, FontStyle.Bold),
                 LinkColor        = SettingsWindow.AccentNeon,
                 ActiveLinkColor  = SettingsWindow.AccentVio,
@@ -128,13 +135,13 @@ namespace NoFences.UI.Pages
             linkCard.Controls.Add(linkGithub);
             cy += 36;
 
-            var btnCheck = CreateCyberButton("⟳  Check for Updates", SettingsWindow.AccentVio, new Point(20, cy), 180);
+            var btnCheck = CreateCyberButton(T("Check for Updates", "Buscar actualizaciones"), SettingsWindow.AccentVio, new Point(20, cy), 180);
             btnCheck.Click += (s, e) =>
                 NoFences.Core.DependencyInjection.GetRequiredService<IUpdateService>().CheckForUpdates(false);
             linkCard.Controls.Add(btnCheck);
 
             // ── Architecture & Credits ──────────────────────────────────────────
-            var techCard = CreateGlassCard("SYSTEM & FRAMEWORK ARCHITECTURE", ref y, 140);
+            var techCard = CreateGlassCard(T("SYSTEM & FRAMEWORK", "SISTEMA"), ref y, 140);
             cy = 42;
 
             techCard.Controls.Add(new Label
@@ -142,6 +149,7 @@ namespace NoFences.UI.Pages
                 Text      = "Runtime: .NET Framework 4.8  ·  Engine: Optimized GDI+ Anti-Aliased Pipeline\nRendering: Dual Buffering + DWM Mica/Acrylic Window Hook Integration\nLicense: Open Source (MIT / GPL Compatible)",
                 Location  = new Point(20, cy),
                 AutoSize  = true,
+                UseMnemonic = false,
                 Font      = new Font("Segoe UI", 9f),
                 ForeColor = SettingsWindow.TxtMid,
                 BackColor = Color.Transparent
@@ -222,6 +230,7 @@ namespace NoFences.UI.Pages
                 Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
                 Cursor    = Cursors.Hand
             };
+            b.Width = Math.Max(b.Width, TextRenderer.MeasureText(text, b.Font).Width + 32); // fit translated text
             b.FlatAppearance.BorderColor        = accent;
             b.FlatAppearance.BorderSize         = 1;
             b.FlatAppearance.MouseOverBackColor = Color.FromArgb(

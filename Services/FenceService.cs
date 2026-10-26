@@ -230,7 +230,7 @@ namespace NoFences.Model
                         {
                             File.WriteAllText(noteFile,
                                 "=== 📝 MIS TAREAS / NOTAS ===\r\n" +
-                                "Universe v2.0.9\r\n\r\n" +
+                                "Universe v2.0.11\r\n\r\n" +
                                 "[ ] Tarea 1: Organizar archivos en Universe Fences\r\n" +
                                 "[ ] Tarea 2: Probar zoom con Ctrl + Rueda del ratón\r\n" +
                                 "[ ] Tarea 3: Personalizar temas y colores CyberGlass\r\n");
