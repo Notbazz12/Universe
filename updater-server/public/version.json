@@ -1,6 +1,6 @@
 {
-  "version": "2.0.12",
-  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.12.exe",
-  "sha256": "f0d0c0d0684da17c6a183defa710296e979778e9e0c90640ed86302b92fe76ae",
-  "releaseNotes": "Universe v2.0.12: nueva notificacion de actualizacion con logo, menu de las fences renovado con iconos y traducido, Ordenar por (nombre, tipo, fecha) y titulos con emoji visibles."
+  "version": "2.0.13",
+  "downloadUrl": "https://github.com/Notbazz12/Universe/raw/main/Installer/Universe_Setup_v2.0.13.exe",
+  "sha256": "0d76ccb4637486b3c209e3a71417d3b41705290b254d662c013fc8e99684f243",
+  "releaseNotes": "Universe v2.0.13: la mascota pasea sola, salta de verdad, se duerme si no usas el PC y se alegra al soltar archivos. Nuevas mascotas: Sakura, Esmeralda, Solar, Nebulosa, Zafiro y Sombra, mas tamanos."
 }

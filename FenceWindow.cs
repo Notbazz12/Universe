@@ -728,6 +728,7 @@ namespace NoFences
                 {
                     breathingEffect.StartBreathing();
                 }
+                UI.DesktopMascotWindow.Cheer();
                 SaveAndRebuild();
             }
         }

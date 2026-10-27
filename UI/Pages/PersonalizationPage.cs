@@ -135,7 +135,7 @@ namespace NoFences.UI.Pages
             themeCard.Controls.Add(themeCombo);
 
             // ── Cyber-Glass Effects ──────────────────────────────────────────────
-            var fxCard = CreateGlassCard(T("CYBER-GLASS & VISUAL EFFECTS", "CYBER-GLASS Y EFECTOS VISUALES"), ref y, 240);
+            var fxCard = CreateGlassCard(T("CYBER-GLASS & VISUAL EFFECTS", "CYBER-GLASS Y EFECTOS VISUALES"), ref y, 284);
             int cy = 42;
             CreateToggleRow(fxCard, T("Iridescent Aura Border (luminous neon gradient glow)", "Borde iridiscente (brillo neón degradado)"), ref cy, fenceInfo.EnableIridescentBorder,
                 on => { fenceInfo.EnableIridescentBorder = on; onChanged?.Invoke(); RefreshPreview(); });
@@ -155,6 +155,19 @@ namespace NoFences.UI.Pages
                 });
             CreateToggleRow(fxCard, T("Breathing Pulse Animation (on file drop/addition)", "Pulso al añadir archivos"), ref cy, fenceInfo.EnableBreathingEffect,
                 on => { fenceInfo.EnableBreathingEffect = on; onChanged?.Invoke(); });
+
+            // Mascot picker (fence headers and desktop pet share it)
+            fxCard.Controls.Add(CreateLabel(T("Mascot", "Mascota"), 20, cy + 4));
+            var skinCombo = new CyberComboBox { Location = new Point(140, cy), Width = 200 };
+            foreach (var skin in MascotProvider.Skins) skinCombo.Items.Add(T(skin.NameEn, skin.NameEs));
+            skinCombo.SelectedIndex = Math.Max(0, Array.IndexOf(MascotProvider.Skins, MascotProvider.CurrentSkin));
+            skinCombo.SelectedIndexChanged += (s, e) =>
+            {
+                MascotProvider.SetSkin(MascotProvider.Skins[skinCombo.SelectedIndex].Id);
+                foreach (Form f in Application.OpenForms) f.Invalidate();
+                RefreshPreview();
+            };
+            fxCard.Controls.Add(skinCombo);
 
             // ── Custom Color Tuning ──────────────────────────────────────────────
             var colorCard = CreateGlassCard(T("CUSTOM COLOR & TRANSPARENCY", "COLOR Y TRANSPARENCIA"), ref y, 226);

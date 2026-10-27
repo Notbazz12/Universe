@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using NoFences.Model;
 using NoFences.Util;
 using NoFences.Win32;
+using static NoFences.Services.LocalizationManager;
 
 namespace NoFences.UI
 {
@@ -39,6 +40,26 @@ namespace NoFences.UI
         // Rendering is the expensive part, so each distinct frame is drawn only once.
         private readonly System.Collections.Generic.Dictionary<int, Bitmap> _frameCache = new System.Collections.Generic.Dictionary<int, Bitmap>();
         private int _lastKey = -1;
+
+        // Autonomous behaviour
+        private readonly Random _rng = new Random();
+        private int _facing = 1;            // 1 = right, -1 = left (sprite is mirrored when walking left)
+        private int _walkRemaining;         // pixels left to wander
+        private int _ticksToNextIdea = 200; // countdown until the pet decides to do something on its own
+        private int _jumpBaseY = int.MinValue;
+        private bool _autoSlept;            // fell asleep because the user went idle
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        private static uint UserIdleMs()
+        {
+            var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf(typeof(LASTINPUTINFO)) };
+            return GetLastInputInfo(ref info) ? unchecked((uint)Environment.TickCount - info.dwTime) : 0;
+        }
 
         #region Win32 P/Invoke for Per-Pixel Alpha Layered Window
 
@@ -143,7 +164,101 @@ namespace NoFences.UI
             MouseUp += Mascot_MouseUp;
             MouseDoubleClick += Mascot_MouseDoubleClick;
 
+            MascotProvider.SkinChanged += MascotProvider_SkinChanged;
+
             // The timer only runs while the window is visible (see OnVisibleChanged)
+        }
+
+        private void MascotProvider_SkinChanged(object sender, EventArgs e)
+        {
+            ClearFrameCache();
+            RenderMascot();
+        }
+
+        private void ClearFrameCache()
+        {
+            foreach (var cached in _frameCache.Values) cached.Dispose();
+            _frameCache.Clear();
+            _lastKey = -1;
+        }
+
+        /// <summary>Happy bounce, e.g. when files are dropped into a fence.</summary>
+        public static void Cheer()
+        {
+            var pet = _instance;
+            if (pet == null || pet.IsDisposed || !pet.Visible) return;
+            pet._autoSlept = false;
+            pet.PlayAnimation(SlimeAnimationState.React);
+        }
+
+        /// <summary>Wandering, hopping, idle-sleep: the pet acts on its own between clicks.</summary>
+        private void UpdateBehavior()
+        {
+            if (_isDragging) return;
+
+            // Fall asleep when the user is away for 3 minutes; wake up as soon as they are back
+            uint idleMs = UserIdleMs();
+            if (idleMs > 180000 && _animState == SlimeAnimationState.Idle)
+            {
+                _autoSlept = true;
+                PlayAnimation(SlimeAnimationState.Sleep);
+                return;
+            }
+            if (_autoSlept && _animState == SlimeAnimationState.Sleep && idleMs < 1500)
+            {
+                _autoSlept = false;
+                PlayAnimation(SlimeAnimationState.React);
+                return;
+            }
+
+            // Real hop: lift the window along a parabola while the jump frames play
+            if (_animState == SlimeAnimationState.Jump && _jumpBaseY != int.MinValue)
+            {
+                float t = Math.Min(1f, (_currentFrame * 4 + _frameTicks) / 20f);
+                Top = _jumpBaseY - (int)(Math.Sin(t * Math.PI) * Height * 0.45);
+            }
+
+            if (_animState == SlimeAnimationState.Walk && _walkRemaining > 0)
+            {
+                var area = Screen.FromControl(this).WorkingArea;
+                int next = Left + _facing * 2;
+                if (next < area.Left || next + Width > area.Right)
+                {
+                    _facing = -_facing; // bump into the edge and turn around
+                    next = Left + _facing * 2;
+                }
+                Left = next;
+                _walkRemaining -= 2;
+                if (_walkRemaining <= 0)
+                {
+                    SavePosition();
+                    PlayAnimation(SlimeAnimationState.Idle);
+                }
+                return;
+            }
+
+            if (_animState != SlimeAnimationState.Idle || !AppConfig.Load().MascotWander) return;
+            if (--_ticksToNextIdea > 0) return;
+            _ticksToNextIdea = _rng.Next(170, 430); // next idea in ~6-15 s
+
+            int roll = _rng.Next(100);
+            if (roll < 45)
+            {
+                _facing = _rng.Next(2) == 0 ? -1 : 1;
+                _walkRemaining = _rng.Next(60, 220);
+                PlayAnimation(SlimeAnimationState.Walk);
+            }
+            else if (roll < 65) PlayAnimation(SlimeAnimationState.Jump);
+            else if (roll < 80) PlayAnimation(SlimeAnimationState.React);
+            // otherwise: keep floating
+        }
+
+        private void SavePosition()
+        {
+            var cfg = AppConfig.Load();
+            cfg.DesktopMascotX = Location.X;
+            cfg.DesktopMascotY = _jumpBaseY != int.MinValue ? _jumpBaseY : Location.Y;
+            cfg.Save();
         }
 
         protected override void OnVisibleChanged(EventArgs e)
@@ -195,6 +310,7 @@ namespace NoFences.UI
                     // Non-looping animations return to Idle
                     if (_animState == SlimeAnimationState.Jump || _animState == SlimeAnimationState.React)
                     {
+                        if (_animState == SlimeAnimationState.Jump) Land();
                         _animState = SlimeAnimationState.Idle;
                         _currentFrame = 0;
                     }
@@ -205,7 +321,15 @@ namespace NoFences.UI
                 }
             }
 
+            UpdateBehavior();
             RenderMascot();
+        }
+
+        private void Land()
+        {
+            if (_jumpBaseY == int.MinValue) return;
+            Top = _jumpBaseY;
+            _jumpBaseY = int.MinValue;
         }
 
         private void InitContextMenu()
@@ -213,26 +337,76 @@ namespace NoFences.UI
             _mascotMenu = new ContextMenuStrip();
             _mascotMenu.Renderer = new FenceMenuRenderer();
 
-            var titleItem = new ToolStripMenuItem("🐾 Cosmic Mascot Companion") { Enabled = false };
+            var titleItem = new ToolStripMenuItem(MascotName()) { Enabled = false };
             titleItem.Font = new Font(_mascotMenu.Font, FontStyle.Bold);
             _mascotMenu.Items.Add(titleItem);
             _mascotMenu.Items.Add(new ToolStripSeparator());
 
-            var petItem = new ToolStripMenuItem("💖 Pet Mascot (Give Love)");
-            petItem.Click += (s, e) => PlayAnimation(SlimeAnimationState.React);
+            var petItem = new ToolStripMenuItem(T("Pet it", "Acariciar"), FenceMenuRenderer.Glyph(""));
+            petItem.Click += (s, e) => { _autoSlept = false; PlayAnimation(SlimeAnimationState.React); };
             _mascotMenu.Items.Add(petItem);
 
-            var moodMenu = new ToolStripMenuItem("✨ Animations & Poses");
-            moodMenu.DropDownItems.Add("💫 Idle Breathing", null, (s, e) => PlayAnimation(SlimeAnimationState.Idle));
-            moodMenu.DropDownItems.Add("🚶 Walk / Move", null, (s, e) => PlayAnimation(SlimeAnimationState.Walk));
-            moodMenu.DropDownItems.Add("🦘 High Jump", null, (s, e) => PlayAnimation(SlimeAnimationState.Jump));
-            moodMenu.DropDownItems.Add("💖 React / Love", null, (s, e) => PlayAnimation(SlimeAnimationState.React));
-            moodMenu.DropDownItems.Add("💤 Sleep (Zzz)", null, (s, e) => PlayAnimation(SlimeAnimationState.Sleep));
+            var moodMenu = new ToolStripMenuItem(T("Actions", "Acciones"), FenceMenuRenderer.Glyph(""));
+            moodMenu.DropDownItems.Add(T("Float", "Flotar"), null, (s, e) => PlayAnimation(SlimeAnimationState.Idle));
+            moodMenu.DropDownItems.Add(T("Take a walk", "Dar un paseo"), null, (s, e) =>
+            {
+                _facing = _rng.Next(2) == 0 ? -1 : 1;
+                _walkRemaining = 160;
+                PlayAnimation(SlimeAnimationState.Walk);
+            });
+            moodMenu.DropDownItems.Add(T("Jump", "Saltar"), null, (s, e) => PlayAnimation(SlimeAnimationState.Jump));
+            moodMenu.DropDownItems.Add(T("Sleep", "Dormir"), null, (s, e) => PlayAnimation(SlimeAnimationState.Sleep));
             _mascotMenu.Items.Add(moodMenu);
+
+            // Pick a mascot (colour variants of the slime)
+            var skinMenu = new ToolStripMenuItem(T("Choose mascot", "Elegir mascota"), FenceMenuRenderer.Glyph(""));
+            foreach (var skin in MascotProvider.Skins)
+            {
+                var id = skin.Id;
+                var item = new ToolStripMenuItem(T(skin.NameEn, skin.NameEs)) { Tag = id };
+                item.Click += (s, e) =>
+                {
+                    MascotProvider.SetSkin(id);
+                    titleItem.Text = MascotName();
+                    foreach (Form f in Application.OpenForms) f.Invalidate(); // fence headers show the mascot too
+                    PlayAnimation(SlimeAnimationState.React);
+                };
+                skinMenu.DropDownItems.Add(item);
+            }
+            skinMenu.DropDownOpening += (s, e) =>
+            {
+                foreach (ToolStripMenuItem it in skinMenu.DropDownItems)
+                    it.Checked = (string)it.Tag == MascotProvider.CurrentSkin.Id;
+            };
+            _mascotMenu.Items.Add(skinMenu);
+
+            var sizeMenu = new ToolStripMenuItem(T("Size", "Tamaño"), FenceMenuRenderer.Glyph(""));
+            foreach (var opt in new[] { Tuple.Create(72, T("Small", "Pequeña")), Tuple.Create(96, T("Medium", "Mediana")), Tuple.Create(128, T("Large", "Grande")) })
+            {
+                int px = opt.Item1;
+                var item = new ToolStripMenuItem(opt.Item2) { Tag = px };
+                item.Click += (s, e) => SetPetSize(px);
+                sizeMenu.DropDownItems.Add(item);
+            }
+            sizeMenu.DropDownOpening += (s, e) =>
+            {
+                foreach (ToolStripMenuItem it in sizeMenu.DropDownItems) it.Checked = (int)it.Tag == Width;
+            };
+            _mascotMenu.Items.Add(sizeMenu);
+
+            var wanderItem = new ToolStripMenuItem(T("Wander on its own", "Pasear por su cuenta"), FenceMenuRenderer.Glyph("")) { Checked = AppConfig.Load().MascotWander };
+            wanderItem.Click += (s, e) =>
+            {
+                var cfg = AppConfig.Load();
+                cfg.MascotWander = !cfg.MascotWander;
+                cfg.Save();
+                wanderItem.Checked = cfg.MascotWander;
+            };
+            _mascotMenu.Items.Add(wanderItem);
 
             _mascotMenu.Items.Add(new ToolStripSeparator());
 
-            var topMostItem = new ToolStripMenuItem("🔝 Always on Top") { Checked = TopMost };
+            var topMostItem = new ToolStripMenuItem(T("Always on top", "Siempre visible"), FenceMenuRenderer.Glyph("")) { Checked = TopMost };
             topMostItem.Click += (s, e) =>
             {
                 TopMost = !TopMost;
@@ -243,7 +417,7 @@ namespace NoFences.UI
             };
             _mascotMenu.Items.Add(topMostItem);
 
-            var hideItem = new ToolStripMenuItem("❌ Hide Desktop Mascot");
+            var hideItem = new ToolStripMenuItem(T("Hide mascot", "Ocultar mascota"), FenceMenuRenderer.Glyph(""));
             hideItem.Click += (s, e) =>
             {
                 Hide();
@@ -256,8 +430,32 @@ namespace NoFences.UI
             ContextMenuStrip = _mascotMenu;
         }
 
+        private static string MascotName()
+        {
+            var skin = MascotProvider.CurrentSkin;
+            return T(skin.NameEn, skin.NameEs);
+        }
+
+        private void SetPetSize(int px)
+        {
+            if (px == Width) return;
+            int bottom = Bottom; // grow upwards so it keeps standing on the same spot
+            Land();
+            Size = new Size(px, px);
+            Top = bottom - px;
+            ClearFrameCache();
+            RenderMascot();
+            var cfg = AppConfig.Load();
+            cfg.DesktopMascotSize = px;
+            cfg.Save();
+            SavePosition();
+        }
+
         public void PlayAnimation(SlimeAnimationState state)
         {
+            if (state != SlimeAnimationState.Jump) Land();
+            else if (_jumpBaseY == int.MinValue) _jumpBaseY = Top;
+            if (state != SlimeAnimationState.Walk) _walkRemaining = 0;
             _animState = state;
             _currentFrame = 0;
             _frameTicks = 0;
@@ -314,7 +512,8 @@ namespace NoFences.UI
 
             int floatY = _animState == SlimeAnimationState.Sleep ? 0 : (int)Math.Round(Math.Sin(_floatAngle) * 3);
             int frame = Math.Max(0, Math.Min(4, _currentFrame));
-            int key = ((int)_animState << 16) | (frame << 8) | (floatY + 3);
+            bool flip = _facing < 0;
+            int key = (flip ? 1 << 24 : 0) | ((int)_animState << 16) | (frame << 8) | (floatY + 3);
 
             // Nothing visible changed since the last frame: skip all drawing work
             if (key == _lastKey) return;
@@ -324,7 +523,7 @@ namespace NoFences.UI
                 var sprite = GetCurrentFrameImage();
                 if (sprite == null) return;
 
-                bmp = RenderFrame(sprite, floatY);
+                bmp = RenderFrame(sprite, floatY, flip);
                 _frameCache[key] = bmp;
             }
 
@@ -332,7 +531,7 @@ namespace NoFences.UI
             SetLayeredBitmap(bmp); // the cache owns the bitmap: do not dispose it here
         }
 
-        private Bitmap RenderFrame(Image sprite, int floatY)
+        private Bitmap RenderFrame(Image sprite, int floatY, bool flip)
         {
             int size = Width;
             var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
@@ -356,8 +555,19 @@ namespace NoFences.UI
                     }
                 }
 
-                // Render Mascot Sprite Frame
+                // Soft contact shadow so the pet sits on the desktop (not while airborne)
+                int shadowW = _animState == SlimeAnimationState.Jump ? 0 : (int)(size * 0.55) - Math.Abs(floatY) * 2;
+                using (var shadow = new SolidBrush(Color.FromArgb(45, 0, 0, 0)))
+                    g.FillEllipse(shadow, (size - shadowW) / 2, size - 14, shadowW, 8);
+
+                // Render Mascot Sprite Frame (mirrored when walking left)
+                if (flip)
+                {
+                    g.TranslateTransform(size, 0);
+                    g.ScaleTransform(-1, 1);
+                }
                 g.DrawImage(sprite, 4, 4 + floatY, size - 8, size - 8);
+                g.ResetTransform();
             }
 
             // Pre-multiply alpha for UpdateLayeredWindow (once per cached frame)
@@ -431,6 +641,9 @@ namespace NoFences.UI
         {
             if (e.Button == MouseButtons.Left)
             {
+                Land();
+                _walkRemaining = 0;
+                _autoSlept = false;
                 _isDragging = true;
                 _hasDragged = false;
                 _dragStartCursor = Cursor.Position;
@@ -540,6 +753,7 @@ namespace NoFences.UI
                 _mainTimer?.Stop();
                 _mainTimer?.Dispose();
                 _mascotMenu?.Dispose();
+                MascotProvider.SkinChanged -= MascotProvider_SkinChanged;
                 foreach (var cached in _frameCache.Values) cached.Dispose();
                 _frameCache.Clear();
             }

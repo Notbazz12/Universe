@@ -23,6 +23,8 @@ namespace NoFences.Model
         public int DesktopMascotY { get; set; } = -1;
         public int DesktopMascotSize { get; set; } = 96;
         public bool DesktopMascotTopMost { get; set; } = false;
+        public string MascotSkin { get; set; } = "Cosmic";
+        public bool MascotWander { get; set; } = true;
         public string UpdateUrl { get; set; } = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
         public Dictionary<string, string> SmartSorterRules { get; set; } = null;
 

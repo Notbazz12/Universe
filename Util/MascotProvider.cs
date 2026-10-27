@@ -23,6 +23,97 @@ namespace NoFences.Util
 
         private static bool _initialized = false;
 
+        /// <summary>A colour variant of the slime: hue shift (degrees) and saturation factor.</summary>
+        public class Skin
+        {
+            public string Id, NameEn, NameEs;
+            public float Hue, Saturation;
+            public Skin(string id, string en, string es, float hue, float sat) { Id = id; NameEn = en; NameEs = es; Hue = hue; Saturation = sat; }
+        }
+
+        // The original slime is cyan (~190°); shifts are relative to it
+        public static readonly Skin[] Skins =
+        {
+            new Skin("Cosmic",  "Cosmic Slime",   "Slime Cósmico",    0f,   1f),
+            new Skin("Sakura",  "Sakura Slime",   "Slime Sakura",     140f, 1f),
+            new Skin("Emerald", "Emerald Slime",  "Slime Esmeralda",  -55f, 1.05f),
+            new Skin("Solar",   "Solar Slime",    "Slime Solar",      -150f, 1.15f),
+            new Skin("Nebula",  "Nebula Slime",   "Slime Nebulosa",   80f,  1.1f),
+            new Skin("Sapphire", "Sapphire Slime", "Slime Zafiro",    45f,  1.25f),
+            new Skin("Shadow",  "Shadow Slime",   "Slime Sombra",     0f,   0.15f),
+        };
+
+        public static Skin CurrentSkin
+        {
+            get
+            {
+                var id = Model.AppConfig.Load().MascotSkin;
+                foreach (var s in Skins) if (s.Id == id) return s;
+                return Skins[0];
+            }
+        }
+
+        /// <summary>Switches the colour variant; every mascot (desktop pet and fence headers) reloads.</summary>
+        public static void SetSkin(string id)
+        {
+            var cfg = Model.AppConfig.Load();
+            if (cfg.MascotSkin == id) return;
+            cfg.MascotSkin = id;
+            cfg.Save();
+            // shortcut: old images are not disposed (a fence may still be painting one); a few MB per switch, fine for a manual action
+            _idleFrames = _walkFrames = _jumpFrames = _reactFrames = _sleepFrames = null;
+            _happy = _wink = _sleep = _excited = _love = _jump = null;
+            SkinChanged?.Invoke(null, EventArgs.Empty);
+        }
+
+        public static event EventHandler SkinChanged;
+
+        /// <summary>Hue-rotates and saturates a sprite with a colour matrix (luminance preserving).</summary>
+        private static Image Recolor(Image src)
+        {
+            var skin = CurrentSkin;
+            if (src == null || (skin.Hue == 0f && skin.Saturation == 1f)) return src;
+
+            double a = skin.Hue * Math.PI / 180.0, c = Math.Cos(a), s = Math.Sin(a);
+            const float lr = 0.213f, lg = 0.715f, lb = 0.072f;
+            // Hue rotation matrix (rows = output r,g,b) followed by saturation scaling
+            float[,] h =
+            {
+                { (float)(lr + c * (1 - lr) + s * -lr),        (float)(lg + c * -lg + s * -lg),        (float)(lb + c * -lb + s * (1 - lb)) },
+                { (float)(lr + c * -lr + s * 0.143),           (float)(lg + c * (1 - lg) + s * 0.140), (float)(lb + c * -lb + s * -0.283) },
+                { (float)(lr + c * -lr + s * -(1 - lr)),       (float)(lg + c * -lg + s * lg),         (float)(lb + c * (1 - lb) + s * lb) },
+            };
+            float k = skin.Saturation;
+            float[,] m = new float[3, 3];
+            for (int r = 0; r < 3; r++)
+                for (int col = 0; col < 3; col++)
+                {
+                    float lum = col == 0 ? lr : col == 1 ? lg : lb;
+                    // saturation: blend the rotated colour with its luminance (S x H simplifies to this)
+                    m[r, col] = lum * (1 - k) + h[r, col] * k;
+                }
+
+            // ColorMatrix is row-vector based: element [input, output]
+            var cm = new System.Drawing.Imaging.ColorMatrix(new[]
+            {
+                new[] { m[0, 0], m[1, 0], m[2, 0], 0f, 0f },
+                new[] { m[0, 1], m[1, 1], m[2, 1], 0f, 0f },
+                new[] { m[0, 2], m[1, 2], m[2, 2], 0f, 0f },
+                new[] { 0f, 0f, 0f, 1f, 0f },
+                new[] { 0f, 0f, 0f, 0f, 1f },
+            });
+
+            var bmp = new Bitmap(src.Width, src.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(bmp))
+            using (var ia = new System.Drawing.Imaging.ImageAttributes())
+            {
+                ia.SetColorMatrix(cm);
+                g.DrawImage(src, new Rectangle(0, 0, src.Width, src.Height), 0, 0, src.Width, src.Height, GraphicsUnit.Pixel, ia);
+            }
+            src.Dispose();
+            return bmp;
+        }
+
         public static string GetMascotDir()
         {
             // 1. Try assembly directory (Universe.exe folder)
@@ -93,7 +184,7 @@ namespace NoFences.Util
                     using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
                         var original = Image.FromStream(fs);
-                        return new Bitmap(original); // Decouple from stream
+                        return Recolor(new Bitmap(original)); // decouple from stream, apply skin
                     }
                 }
             }
@@ -123,7 +214,7 @@ namespace NoFences.Util
                             using (var fs = new FileStream(framePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                             {
                                 var original = Image.FromStream(fs);
-                                frames.Add(new Bitmap(original));
+                                frames.Add(Recolor(new Bitmap(original)));
                             }
                         }
                     }
