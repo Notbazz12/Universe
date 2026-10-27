@@ -11,6 +11,8 @@ using System.Windows.Forms;
 using NoFences.Effects;
 using NoFences.Services;
 using static NoFences.Win32.WindowUtil;
+using static NoFences.Services.LocalizationManager;
+using static NoFences.UI.FenceMenuRenderer;
 
 namespace NoFences
 {
@@ -526,6 +528,86 @@ namespace NoFences
             }
         }
 
+        private void SortFiles<TKey>(Func<string, TKey> key)
+        {
+            var sorted = fenceInfo.Files.OrderBy(key).ToList();
+            fenceInfo.Files.Clear();
+            fenceInfo.Files.AddRange(sorted);
+            SaveAndRebuild();
+        }
+
+        private static DateTime SafeLastWrite(string path)
+        {
+            try { return File.Exists(path) ? File.GetLastWriteTime(path) : Directory.GetLastWriteTime(path); }
+            catch { return DateTime.MinValue; }
+        }
+
+        /// <summary>
+        /// GDI+ has no font fallback, so emoji in a title ("🎮 Games") drew as an empty box.
+        /// Splits the text into runs and draws emoji runs with Segoe UI Emoji.
+        /// </summary>
+        private static void DrawTitleText(Graphics g, string text, Font font, Brush brush, RectangleF rect, StringFormat align)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            var runs = SplitEmojiRuns(text);
+            if (runs.Count == 1 && !runs[0].Item2)
+            {
+                g.DrawString(text, font, brush, rect, align);
+                return;
+            }
+
+            using (var emojiFont = new Font("Segoe UI Emoji", font.Size * 0.9f, FontStyle.Regular, font.Unit))
+            {
+                var fmt = StringFormat.GenericTypographic;
+                var widths = new float[runs.Count];
+                float total = 0;
+                for (int i = 0; i < runs.Count; i++)
+                {
+                    // Typographic measuring drops trailing spaces: count them as a space width each
+                    var run = runs[i].Item1;
+                    var f = runs[i].Item2 ? emojiFont : font;
+                    widths[i] = g.MeasureString(run, f, PointF.Empty, fmt).Width
+                              + (run.Length - run.TrimEnd(' ').Length) * g.MeasureString("a a", f, PointF.Empty, fmt).Width / 3f;
+                    total += widths[i];
+                }
+
+                float x = align.Alignment == StringAlignment.Near ? rect.Left
+                        : align.Alignment == StringAlignment.Far ? rect.Right - total
+                        : rect.Left + (rect.Width - total) / 2f;
+                x = Math.Max(rect.Left, x);
+
+                for (int i = 0; i < runs.Count; i++)
+                {
+                    var f = runs[i].Item2 ? emojiFont : font;
+                    float h = g.MeasureString(runs[i].Item1, f, PointF.Empty, fmt).Height;
+                    g.DrawString(runs[i].Item1, f, brush, x, rect.Top + (rect.Height - h) / 2f, fmt);
+                    x += widths[i];
+                }
+            }
+        }
+
+        private static List<Tuple<string, bool>> SplitEmojiRuns(string text)
+        {
+            var runs = new List<Tuple<string, bool>>();
+            var sb = new System.Text.StringBuilder();
+            bool? current = null;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '️' || c == '‍') { if (current == true) sb.Append(c); continue; } // emoji presentation / joiner
+                bool isEmoji = char.IsSurrogate(c) || (c >= '☀' && c <= '➿') || (c >= '⬀' && c <= '⯿');
+                if (current.HasValue && current.Value != isEmoji)
+                {
+                    runs.Add(Tuple.Create(sb.ToString(), current.Value));
+                    sb.Clear();
+                }
+                current = isEmoji;
+                sb.Append(c);
+            }
+            if (sb.Length > 0) runs.Add(Tuple.Create(sb.ToString(), current ?? false));
+            return runs;
+        }
+
         private void FenceWindow_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop) && !fenceInfo.Locked)
@@ -957,13 +1039,13 @@ namespace NoFences
 
                     if (isCyberGlass)
                     {
-                        g.DrawString(Text, titleFont, Brushes.White, titleRect, align);
+                        DrawTitleText(g, Text, titleFont, Brushes.White, titleRect, align);
                     }
                     else
                     {
                         using (var titleTextBrush = new SolidBrush(Color.FromArgb(fenceInfo.TitleTextColor)))
                         {
-                            g.DrawString(Text, titleFont, titleTextBrush, titleRect, align);
+                            DrawTitleText(g, Text, titleFont, titleTextBrush, titleRect, align);
                         }
                     }
 
@@ -1262,13 +1344,13 @@ namespace NoFences
             appContextMenu.Renderer = new NoFences.UI.FenceMenuRenderer();
 
             // Rename
-            appContextMenu.Items.Add(new ToolStripMenuItem(Services.LocalizationManager.GetString("RenameFence"), null, (s, args) => renameToolStripMenuItem_Click(s, args)));
+            appContextMenu.Items.Add(new ToolStripMenuItem(Services.LocalizationManager.GetString("RenameFence"), Glyph(""), (s, args) => renameToolStripMenuItem_Click(s, args)));
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // New Fence
-            var newFenceMenu = new ToolStripMenuItem(Services.LocalizationManager.GetString("NewFence") ?? "New Fence");
+            var newFenceMenu = new ToolStripMenuItem(Services.LocalizationManager.GetString("NewFence") ?? "New Fence", Glyph(""));
 
-            var newGeneralFence = new ToolStripMenuItem("📄 General Fence");
+            var newGeneralFence = new ToolStripMenuItem(T("General Fence", "Fence general"), Glyph(""));
             newGeneralFence.Click += (s, args) =>
             {
                 var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
@@ -1276,7 +1358,7 @@ namespace NoFences
             };
             newFenceMenu.DropDownItems.Add(newGeneralFence);
 
-            var newImageFence = new ToolStripMenuItem("🖼️ New Fence: Images (Auto-Import)");
+            var newImageFence = new ToolStripMenuItem(T("Images Fence (auto-import)", "Fence de imágenes (auto-importar)"), Glyph(""));
             newImageFence.Click += (s, args) =>
             {
                 var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
@@ -1284,7 +1366,7 @@ namespace NoFences
             };
             newFenceMenu.DropDownItems.Add(newImageFence);
 
-            var newTaskFence = new ToolStripMenuItem("📝 New Fence: Tasks & Notes (Auto-Import)");
+            var newTaskFence = new ToolStripMenuItem(T("Tasks && Notes Fence (auto-import)", "Fence de tareas y notas (auto-importar)"), Glyph(""));
             newTaskFence.Click += (s, args) =>
             {
                 var fenceService = NoFences.Core.DependencyInjection.GetRequiredService<NoFences.Model.IFenceService>();
@@ -1295,22 +1377,22 @@ namespace NoFences
             appContextMenu.Items.Add(newFenceMenu);
 
             // Import Folder (NEW)
-            var importFolderItem = new ToolStripMenuItem("Import Folder Content");
+            var importFolderItem = new ToolStripMenuItem(T("Import Folder Content...", "Importar contenido de carpeta..."), Glyph(""));
             importFolderItem.Click += (s, args) => ImportFolder();
             appContextMenu.Items.Add(importFolderItem);
 
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // View / Icon Size
-            var viewItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("View") ?? "View");
-            var iconSizeSubMenu = new ToolStripMenuItem("Icon Size");
+            var viewItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("View") ?? "View", Glyph(""));
+            var iconSizeSubMenu = new ToolStripMenuItem(T("Icon Size", "Tamaño de icono"));
             int[] sizes = { 16, 20, 24, 32, 40, 48, 64 };
-            string[] sizeLabels = { "16 px (Extra Small)", "20 px (Compact)", "24 px (Small)", "32 px (Normal)", "40 px (Medium)", "48 px (Large)", "64 px (Extra Large)" };
+            string[] sizeLabels = { T("16 px (Extra Small)", "16 px (Muy pequeño)"), T("20 px (Compact)", "20 px (Compacto)"), T("24 px (Small)", "24 px (Pequeño)"),
+                                    T("32 px (Normal)", "32 px (Normal)"), T("40 px (Medium)", "40 px (Mediano)"), T("48 px (Large)", "48 px (Grande)"), T("64 px (Extra Large)", "64 px (Muy grande)") };
             for (int i = 0; i < sizes.Length; i++)
             {
                 int s = sizes[i];
-                var sizeOption = new ToolStripMenuItem(sizeLabels[i]);
-                sizeOption.Checked = (fenceInfo.IconSize == s);
+                var sizeOption = new ToolStripMenuItem(sizeLabels[i]) { Tag = s };
                 sizeOption.Click += (s2, args2) =>
                 {
                     fenceInfo.IconSize = s;
@@ -1320,22 +1402,32 @@ namespace NoFences
                 };
                 iconSizeSubMenu.DropDownItems.Add(sizeOption);
             }
+            // Ctrl+wheel also changes the size, so the check mark is refreshed on every open
+            iconSizeSubMenu.DropDownOpening += (s, args) =>
+            {
+                foreach (ToolStripMenuItem opt in iconSizeSubMenu.DropDownItems)
+                    opt.Checked = (int)opt.Tag == CurrentIconSize;
+            };
             viewItem.DropDownItems.Add(iconSizeSubMenu);
             appContextMenu.Items.Add(viewItem);
 
             // Sort
-            var sortItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("SortBy"));
+            var sortItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("SortBy"), Glyph(""));
+            sortItem.DropDownItems.Add(T("Name", "Nombre"), null, (s, args) => SortFiles(f => Path.GetFileName(f)));
+            sortItem.DropDownItems.Add(T("Type", "Tipo"), null, (s, args) => SortFiles(f => Path.GetExtension(f) + "|" + Path.GetFileName(f)));
+            sortItem.DropDownItems.Add(T("Date modified (newest first)", "Fecha de modificación (recientes primero)"), null,
+                (s, args) => SortFiles(f => DateTime.MaxValue - SafeLastWrite(f)));
             appContextMenu.Items.Add(sortItem);
 
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // Configure
-            var configItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("ConfigureFences"));
+            var configItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("ConfigureFences"), Glyph(""));
             configItem.Click += (s, args) => OpenSettings();
             appContextMenu.Items.Add(configItem);
 
             // Lock
-            lockedToolStripMenuItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("LockFences"), null, (s, args) => {
+            lockedToolStripMenuItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("LockFences"), Glyph(""), (s, args) => {
                 lockedToolStripMenuItem.Checked = !lockedToolStripMenuItem.Checked;
                 lockedToolStripMenuItem_Click(s, args);
             });
@@ -1343,7 +1435,7 @@ namespace NoFences
             appContextMenu.Items.Add(lockedToolStripMenuItem);
 
             // Minify
-            minifyToolStripMenuItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("Minify"), null, (s, args) => {
+            minifyToolStripMenuItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("Minify"), Glyph(""), (s, args) => {
                 minifyToolStripMenuItem.Checked = !minifyToolStripMenuItem.Checked;
                 fenceInfo.CanMinify = minifyToolStripMenuItem.Checked;
                 Save();
@@ -1357,9 +1449,9 @@ namespace NoFences
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // Remove Fence
-            appContextMenu.Items.Add(new ToolStripMenuItem(Services.LocalizationManager.GetString("RemoveFence"), null, (s, args) => 
+            appContextMenu.Items.Add(new ToolStripMenuItem(Services.LocalizationManager.GetString("RemoveFence"), Glyph(""), (s, args) => 
             {
-                if (MessageBox.Show(this, "Are you sure you want to remove this fence?", "Remove Fence", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                if (MessageBox.Show(this, T("Remove this fence? Your files stay on the desktop.", "¿Eliminar esta fence? Tus archivos se quedan en el escritorio."), "Universe", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                 {
                     var fenceService = NoFences.Core.DependencyInjection.GetService<NoFences.Model.IFenceService>();
                     if (fenceService != null)
@@ -1372,7 +1464,7 @@ namespace NoFences
             appContextMenu.Items.Add(new ToolStripSeparator());
 
             // Exit Application
-            var exitItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("ExitUniverse"), null, (s, args) =>
+            var exitItem = new ToolStripMenuItem(Services.LocalizationManager.GetString("ExitUniverse"), Glyph(""), (s, args) =>
             {
                 if (MessageBox.Show(this, Services.LocalizationManager.GetString("ConfirmExit"), "Universe", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {

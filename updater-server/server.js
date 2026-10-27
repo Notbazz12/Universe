@@ -36,10 +36,10 @@ app.get('/version.json', (req, res) => {
         res.json(data);
     } else {
         res.json({
-            version: "2.0.11",
-            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.11.exe`,
-            sha256: "64458733b2f4f9194921f4d2627e451a5cb966802e78ffac1b8042ebd520cc72",
-            releaseNotes: "Universe v2.0.11: ventana de Ajustes renovada y traducida al espanol, iconos corregidos, deslizadores de color nuevos y cambio de idioma al instante."
+            version: "2.0.12",
+            downloadUrl: `${req.protocol}://${req.get('host')}/Universe_Setup_v2.0.12.exe`,
+            sha256: "f0d0c0d0684da17c6a183defa710296e979778e9e0c90640ed86302b92fe76ae",
+            releaseNotes: "Universe v2.0.12: nueva notificacion de actualizacion con logo, menu de las fences renovado con iconos y traducido, Ordenar por (nombre, tipo, fecha) y titulos con emoji visibles."
         });
     }
 });

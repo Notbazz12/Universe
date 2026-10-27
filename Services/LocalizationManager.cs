@@ -19,7 +19,7 @@ namespace NoFences.Services
             // Context Menu
             { "ConfigureFences", new Dictionary<Language, string> { { Language.English, "Configure Fences..." }, { Language.Spanish, "Configurar Fences..." } } },
             { "LockFences", new Dictionary<Language, string> { { Language.English, "Lock Fences" }, { Language.Spanish, "Bloquear Fences" } } },
-            { "Minify", new Dictionary<Language, string> { { Language.English, "Minify" }, { Language.Spanish, "Minimizar" } } },
+            { "Minify", new Dictionary<Language, string> { { Language.English, "Auto Roll-up" }, { Language.Spanish, "Plegar automáticamente" } } },
             { "View", new Dictionary<Language, string> { { Language.English, "View" }, { Language.Spanish, "Ver" } } },
             { "SortBy", new Dictionary<Language, string> { { Language.English, "Sort By" }, { Language.Spanish, "Ordenar por" } } },
             { "RenameFence", new Dictionary<Language, string> { { Language.English, "Rename..." }, { Language.Spanish, "Renombrar..." } } },

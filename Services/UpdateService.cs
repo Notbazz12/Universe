@@ -21,7 +21,7 @@ namespace NoFences.Services
     public class UpdateService : IUpdateService
     {
         private const string DefaultVersionUrl = "https://raw.githubusercontent.com/Notbazz12/Universe/main/version.json";
-        public const string CurrentVersion = "2.0.11";
+        public const string CurrentVersion = "2.0.12";
         private readonly ILoggingService _loggingService;
 
         // Captured on construction (UI thread); used to marshal MessageBox calls
@@ -130,18 +130,9 @@ namespace NoFences.Services
 
                                 if (config.ShowNotifications)
                                 {
-                                    bool isSpanish = config.Language == "Spanish";
-                                    string title = isSpanish 
-                                        ? "🚀 Universe - ¡Nueva Actualización!" 
-                                        : "🚀 Universe - Update Available!";
-                                    string msg = isSpanish
-                                        ? $"¡La versión v{remoteVersion} está lista!\nHaz clic aquí para actualizar automáticamente."
-                                        : $"Universe v{remoteVersion} is now available!\nClick here to download and install.";
-
-                                    tray.ShowNotification(title, msg, ToolTipIcon.Info, () =>
-                                    {
-                                        PromptUpdate(remoteVersion, downloadUrl, expectedHash, releaseNotes);
-                                    });
+                                    // Branded card with logo, notes and an "Update now" button
+                                    RunOnUiThread(() => UI.UpdateToast.ShowUpdate(remoteVersion, releaseNotes,
+                                        () => DownloadAndInstall(downloadUrl, expectedHash, remoteVersion)));
                                 }
                             }
                         }
